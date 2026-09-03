@@ -11,7 +11,7 @@ export function Topbar() {
   return (
     <header className="topbar">
       <div className="brand">
-        <span className="brand-logo" aria-hidden="true">☀</span>
+        <img className="brand-logo" src="/logo-xiaotao.png" alt="小桃 Logo" />
         <span className="brand-name">治愈系图片生成器</span>
       </div>
       <div className="topbar-right">

@@ -58,7 +58,7 @@ export function InputPanel() {
       </section>
 
       <section className="panel-block">
-        <h2 className="panel-title"><span className="step">②</span> 卡片数量 N</h2>
+        <h2 className="panel-title"><span className="step">②</span> 卡片数量</h2>
         <div className="stepper">
           <button className="step-btn" aria-label="减少" disabled={state.n <= 1} onClick={() => dispatch({ type: 'SET_N', n: state.n - 1 })}>−</button>
           <span className="step-val">{state.n}</span>

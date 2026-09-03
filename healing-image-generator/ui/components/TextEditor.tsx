@@ -290,11 +290,11 @@ export function TextEditor() {
       </div>
       <div className="text-editor-row">
         <span className="ctrl-label">描边</span>
-        <ColorField color={box.strokeColor ?? '#FFFFFF'} onChange={c => update({ strokeColor: c, strokeWidth: box.strokeWidth || 4 })} label="描边颜色" />
+        <ColorField color={box.strokeColor ?? '#3E362E'} onChange={c => update({ strokeColor: c, strokeWidth: box.strokeWidth || 4 })} label="描边颜色" />
         <input
           type="range" min={0} max={16} step={1} className="size-range"
           value={box.strokeWidth ?? 0}
-          onChange={e => update({ strokeWidth: Number(e.target.value), strokeColor: box.strokeColor ?? '#FFFFFF' })} // 只调宽度没选色时给默认白描边
+          onChange={e => update({ strokeWidth: Number(e.target.value), strokeColor: box.strokeColor ?? '#3E362E' })} // 只调宽度没选色时给默认深色描边（白色在浅底上不可见）
         />
         <span className="size-val">{box.strokeWidth ?? 0}</span>
         <span className="ctrl-label">背景色</span>

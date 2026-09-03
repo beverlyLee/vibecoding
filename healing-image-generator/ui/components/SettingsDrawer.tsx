@@ -132,6 +132,13 @@ export function SettingsDrawer() {
             )}
           </div>
           {profile.note && <p className="privacy-note sub">{profile.name}：{profile.note}</p>}
+          {profile.consoleLinks?.length ? (
+            <p className="privacy-note sub">
+              {profile.consoleLinks.map(l => (
+                <a key={l.url} href={l.url} target="_blank" rel="noreferrer" className="console-link">↗ {l.label}</a>
+              ))}
+            </p>
+          ) : null}
           <p className="privacy-note">
             🔒 隐私说明：照片默认只在你浏览器本地处理，<b>不上传</b>任何服务器。仅当你使用 AI 功能并填入自己的
             凭据后，才会把「图片+文案」发往<b>你配置的</b>供应商。关闭 AI 则为纯离线。

@@ -67,7 +67,7 @@ export function ControlBar() {
           ))}
         </div>
       </div>
-      <span className="mode-pill">文字样式在预览下方编辑 · {activePalette?.name ?? ''}</span>
+      <span className="mode-pill">背景：{activePalette?.name ?? ''} · 点预览文字改样式</span>
     </div>
   );
 }

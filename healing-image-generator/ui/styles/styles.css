@@ -46,9 +46,9 @@ body {
 }
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand-logo {
-  width: 30px; height: 30px; border-radius: 10px;
-  background: var(--accent); color: #fff;
-  display: grid; place-items: center; font-size: 16px;
+  width: 32px; height: 32px; border-radius: 10px;
+  object-fit: cover; display: block;
+  box-shadow: var(--shadow-sm);
 }
 .brand-name { font-weight: 700; font-size: 17px; color: var(--ink); }
 .topbar-right { display: flex; align-items: center; gap: 14px; }
@@ -304,6 +304,9 @@ body {
   background: conic-gradient(#f66, #fc6, #ff6, #6f9, #6cf, #96f, #f66);
   z-index: -1;
 }
+.console-link { display: inline-block; margin-right: 12px; color: var(--accent, #B5773A); text-decoration: none; border-bottom: 1px dashed currentColor; }
+.console-link:hover { opacity: 0.75; }
+
 .color-wheel-empty { /* 未选背景色：按钮本身显示为彩色色轮，标识可点开取色 */
   background: conic-gradient(#f66, #fc6, #ff6, #6f9, #6cf, #96f, #f66) !important;
   box-shadow: inset 0 0 0 2px rgba(255,255,255,0.85);

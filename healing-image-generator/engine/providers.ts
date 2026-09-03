@@ -17,6 +17,7 @@ export interface ProviderProfile {
   image?: ImageProfile;
   needsProxy: boolean;          // 浏览器直连是否被 CORS 拦截（dev 由 vite 代理转发）
   note?: string;                // 设置抽屉内展示的接入提示
+  consoleLinks?: Array<{ label: string; url: string }>; // 控制台快捷入口（开通模型 / 管理 Key）
 }
 
 export const PROVIDERS: ProviderProfile[] = [
@@ -33,7 +34,11 @@ export const PROVIDERS: ProviderProfile[] = [
       extra: { response_format: 'b64_json', watermark: false },
     },
     needsProxy: true,
-    note: '生图需开通 Seedream 系列；doubao-seed 文本模型不能生图。若测试提示 CORS 拦截，说明 dev 代理未生效。',
+    note: '生图需开通 Seedream 系列；doubao-seed 文本模型不能生图。API Key 须为 ark- 开头（控制台「API Key 管理」创建），火山引擎 AccessKey 无效。',
+    consoleLinks: [
+      { label: '开通模型（先开通才能调用）', url: 'https://console.volcengine.com/ark/region:cn-beijing/openManagement?LLM=%7B%7D&advancedActiveKey=model' },
+      { label: '创建 API Key', url: 'https://console.volcengine.com/ark/region:cn-beijing/apiKey' },
+    ],
   },
   {
     id: 'hunyuan',
