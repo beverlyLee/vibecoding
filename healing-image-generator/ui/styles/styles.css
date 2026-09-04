@@ -304,6 +304,11 @@ body {
   background: conic-gradient(#f66, #fc6, #ff6, #6f9, #6cf, #96f, #f66);
   z-index: -1;
 }
+.key-wrap { display: flex; align-items: center; gap: 6px; }
+.key-wrap input { flex: 1; }
+.key-eye { border: none; background: none; cursor: pointer; font-size: 14px; padding: 2px 4px; opacity: 0.6; }
+.key-eye:hover { opacity: 1; }
+
 .console-link { display: inline-block; margin-right: 12px; color: var(--accent, #B5773A); text-decoration: none; border-bottom: 1px dashed currentColor; }
 .console-link:hover { opacity: 0.75; }
 

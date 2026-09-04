@@ -40,6 +40,7 @@ export function SettingsDrawer() {
 
   const [chatTest, setChatTest] = useState<TestState>(TEST_IDLE);
   const [imgTest, setImgTest] = useState<TestState>(TEST_IDLE);
+  const [showKey, setShowKey] = useState(false);
 
   const runChatTest = async () => {
     setChatTest({ busy: true, msg: '' });
@@ -98,7 +99,10 @@ export function SettingsDrawer() {
             )}
             <label className="field">
               <span>API Key</span>
-              <input type="password" value={creds.apiKey} placeholder="sk-..." autoComplete="off" onChange={e => patchCreds({ apiKey: e.target.value })} />
+              <span className="key-wrap">
+                <input type={showKey ? 'text' : 'password'} value={creds.apiKey} placeholder="ark-..." autoComplete="off" onChange={e => patchCreds({ apiKey: e.target.value })} />
+                <button type="button" className="key-eye" title={showKey ? '隐藏' : '显示'} onClick={() => setShowKey(v => !v)}>{showKey ? '🙈' : '👁'}</button>
+              </span>
             </label>
             <label className="field">
               <span>模型（文案 / 情绪线索）</span>

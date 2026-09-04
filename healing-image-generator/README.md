@@ -2,26 +2,6 @@
 
 上传一张照片、写一段文案，一键生成整套风格统一的治愈系卡片：自动配色、多种版式、可拖动文字排版，支持 AI 代写文案与 AI 生成相似图。所有处理均在浏览器本地完成，照片不会上传。
 
-## 访问方法
-
-**在线访问（推荐）**：项目已配置 Vercel 部署文件（`vercel.json`），将 `healing-image-generator/` 目录导入 Vercel（或 Netlify，配合 `public/_redirects`）即可获得在线地址，无需服务器。
-
-**本地运行**：
-
-```bash
-# 1. 克隆仓库（项目在 healing-image-generator/ 子目录）
-git clone https://github.com/beverlyLee/vibecoding
-cd vibecoding/healing-image-generator
-
-# 2. 安装依赖并启动（要求 Node 18+）
-npm install
-npm run dev        # 打开 http://localhost:5173
-```
-
-**本地服务器部署**：`npm run build && node server.js`，同端口提供静态页面 + 火山方舟 API 反向代理，适合 VPS / Render / Railway 等 Node 环境。
-
-> AI 代写 / AI 生图需要自行配置供应商 API Key：打开页面右上角 ⚙ 设置，选择供应商并填入 Key（详见下文「AI 配置」）。不配置也能使用配色、版式、文字排版等全部本地功能。
-
 ## 功能特性
 
 - **两种模式**：默认模式（1 张照片复用 + 文案自动切成 N 段）／ 逐图主体（N 张照片各成一卡）

@@ -53,6 +53,13 @@ function proxy(req, res, prefix) {
   delete headers.host; // 交给 URL 决定，否则上游虚拟主机路由会错
   delete headers['accept-encoding']; // 不解压，直接透传原始字节
 
+  // 部分托管平台边缘层会剥掉标准 Authorization 头；前端因此在走代理时
+  // 额外携带 x-proxy-authorization，这里把它还原为 Authorization 再转发。
+  if (headers['x-proxy-authorization']) {
+    headers.authorization = headers['x-proxy-authorization'];
+    delete headers['x-proxy-authorization'];
+  }
+
   const chunks = [];
   req.on('data', (c) => chunks.push(c));
   req.on('end', () => {

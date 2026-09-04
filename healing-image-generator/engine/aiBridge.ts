@@ -35,7 +35,13 @@ interface ChatResponse {
 export interface AiTestResult { ok: boolean; msg: string }
 
 function chatHeaders(rt: AiRuntime, json = true): Record<string, string> {
-  const h: Record<string, string> = { Authorization: `Bearer ${rt.apiKey}` };
+  // trim 防护：粘贴 Key 带来的首尾空格/换行会导致方舟 401 "missing or invalid"
+  const h: Record<string, string> = { Authorization: `Bearer ${rt.apiKey.trim()}` };
+  // 走 /proxy-* 时额外附带自定义头：部分托管平台边缘层会剥掉标准 Authorization 头，
+  // 由 server.js 代理在转发前把它还原为 Authorization（见 server.js proxy()）。
+  if (rt.baseUrl.startsWith('/proxy-')) {
+    h['x-proxy-authorization'] = `Bearer ${rt.apiKey.trim()}`;
+  }
   if (json) h['Content-Type'] = 'application/json';
   return h;
 }
