@@ -1,0 +1,34 @@
+@use '@/styles/variables.scss' as *;
+
+.wrap {
+  @include flex-center;
+  flex-direction: column;
+  padding: 96rpx $page-padding;
+}
+
+.emojiCircle {
+  @include flex-center;
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: $radius-round;
+  background: linear-gradient(135deg, #fff4dd 0%, #ffe8b3 100%);
+  margin-bottom: $spacing-lg;
+}
+
+.emoji {
+  font-size: 64rpx;
+}
+
+.title {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-secondary;
+  margin-bottom: $spacing-sm;
+}
+
+.desc {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  text-align: center;
+  line-height: $line-height-loose;
+}

@@ -1,0 +1,43 @@
+// ============================================
+// 主题配色变量（嘴替鸭 · 暖黄治愈系）
+// ============================================
+
+// 品牌主题色：鸭黄
+$color-primary: #ffb020;
+$color-primary-light: #ffd05a;
+$color-primary-dark: #e8940a;
+
+// 主按钮上的文字色（深棕，保证在鸭黄上可读）
+$color-on-primary: #4a3200;
+// 主按钮渐变
+$color-gradient-primary: linear-gradient(135deg, #ffd05a 0%, #ffb020 100%);
+// 选中态文字色（tabBar 等，用加深的主色保证对比）
+$color-primary-deep: #d98706;
+
+// 功能色
+$color-success: #00b42a;
+$color-warning: #ff7d00;
+$color-error: #f53f3f;
+$color-info: #165dff;
+
+// 回应风格色
+$color-style-gentle: #00b42a; // 温和化解
+$color-style-humor: #ff7d00; // 幽默带过
+$color-style-direct: #f53f3f; // 直接拒绝
+$color-style-counter: #722ed1; // 反将一军
+
+// 背景色
+$color-bg-page: #fff9ef;
+$color-bg-card: #ffffff;
+$color-bg-hover: #fff4dd;
+
+// 文本色
+$color-text-primary: #1d2129;
+$color-text-secondary: #4e5969;
+$color-text-tertiary: #86909c;
+$color-text-disabled: #c9cdd4;
+$color-text-white: #ffffff;
+
+// 边框色
+$color-border: #e5e6eb;
+$color-divider: #f2f3f5;

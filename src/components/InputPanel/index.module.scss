@@ -1,0 +1,161 @@
+@use '@/styles/variables.scss' as *;
+
+.panel {
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: 32rpx;
+  box-shadow: $shadow-card;
+}
+
+// 快捷示例
+.samples {
+  margin-bottom: $spacing-md;
+}
+
+.samplesLabel {
+  display: block;
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  margin-bottom: $spacing-sm;
+}
+
+.sampleWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-sm;
+}
+
+.sampleChip {
+  display: flex;
+  align-items: center;
+  height: 60rpx;
+  border-radius: $radius-round;
+  transition: all $transition-fast;
+
+  &:active {
+    opacity: 0.8;
+  }
+}
+
+.sampleChipText {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  background: $color-bg-hover;
+  border: 1rpx solid $color-border;
+  border-radius: $radius-round;
+  padding: 8rpx 24rpx;
+  height: 48rpx;
+  line-height: 48rpx;
+  white-space: nowrap;
+}
+
+// 输入框
+.inputBox {
+  border: 2rpx solid $color-border;
+  border-radius: $radius-md;
+  padding: 24rpx;
+  transition: border-color $transition-base;
+}
+
+.inputBoxRecording {
+  border-color: $color-primary;
+  background: #fffdf5;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 160rpx;
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  line-height: $line-height-normal;
+}
+
+.placeholder {
+  color: $color-text-disabled;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16rpx;
+  min-height: 32rpx;
+}
+
+.voiceHint {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+}
+
+.voiceHintActive {
+  color: $color-primary-dark;
+}
+
+.count {
+  font-size: $font-size-xs;
+  color: $color-text-disabled;
+}
+
+// 操作区
+.actions {
+  display: flex;
+  gap: $spacing-sm;
+  margin-top: $spacing-lg;
+}
+
+.voiceBtn {
+  @include button-reset;
+  width: 200rpx;
+  height: $button-height-lg;
+  border-radius: $radius-button;
+  font-size: $font-size-md;
+  font-weight: $font-weight-medium;
+  color: $color-primary-dark;
+  background: #fff4dd;
+  border: 2rpx solid $color-primary-light;
+  transition: all $transition-fast;
+
+  &:active {
+    opacity: 0.85;
+    transform: scale(0.98);
+  }
+}
+
+.voiceBtnRecording {
+  color: $color-text-white;
+  background: $color-error;
+  border-color: $color-error;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 63, 63, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 12rpx rgba(245, 63, 63, 0);
+  }
+}
+
+.submitBtn {
+  @include button-reset;
+  flex: 1;
+  height: $button-height-lg;
+  border-radius: $radius-button;
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $color-on-primary;
+  background: $color-gradient-primary;
+  border: none;
+  transition: all $transition-fast;
+
+  &:active {
+    opacity: 0.9;
+    transform: scale(0.98);
+  }
+}
+
+.submitBtnDisabled {
+  opacity: 0.5;
+}

@@ -1,0 +1,18 @@
+@use '@/styles/variables.scss' as *;
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 4rpx 16rpx;
+  border-radius: $radius-xs;
+  border: 1rpx solid;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.tagSm {
+  padding: 2rpx 12rpx;
+  font-size: 20rpx;
+}

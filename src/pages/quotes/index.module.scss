@@ -1,0 +1,121 @@
+@use '@/styles/variables.scss' as *;
+
+.page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #fff3d6 0%, $color-bg-page 400rpx);
+  padding: 24rpx $page-padding 48rpx;
+}
+
+.hero {
+  display: flex;
+  align-items: center;
+  margin-bottom: $spacing-lg;
+  padding: 0 8rpx;
+}
+
+.duck {
+  width: 80rpx;
+  height: 80rpx;
+  margin-right: $spacing-md;
+  border-radius: 20rpx;
+}
+
+.heroTexts {
+  display: flex;
+  flex-direction: column;
+}
+
+.heroTitle {
+  font-size: $font-size-xxl;
+  font-weight: $font-weight-bold;
+  color: $color-text-primary;
+}
+
+.heroDesc {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  margin-top: 4rpx;
+}
+
+.filterBar {
+  margin-bottom: $spacing-lg;
+}
+
+.filterScroll {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.chip {
+  display: inline-block;
+  vertical-align: top;
+  padding: 12rpx 32rpx;
+  margin-right: $spacing-sm;
+  border-radius: $radius-round;
+  font-size: $font-size-md;
+  color: $color-text-secondary;
+  background: $color-bg-card;
+  border: 1rpx solid $color-border;
+  white-space: nowrap;
+  transition: all $transition-fast;
+}
+
+.chipActive {
+  color: $color-on-primary;
+  background: $color-gradient-primary;
+  border-color: $color-primary;
+  font-weight: $font-weight-medium;
+}
+
+.countTip {
+  display: block;
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin: 0 8rpx $spacing-md;
+}
+
+.emptyList {
+  margin-top: 48rpx;
+}
+
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-md;
+}
+
+.searchInput {
+  flex: 1;
+  height: 72rpx;
+  padding: 0 24rpx;
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  border: 1rpx solid $color-border;
+}
+
+.refreshBtn {
+  flex-shrink: 0;
+  height: 72rpx;
+  padding: 0 24rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  font-size: $font-size-sm;
+  color: $color-primary;
+  border: 1rpx solid $color-border;
+  transition: all $transition-fast;
+
+  &:active {
+    opacity: 0.7;
+  }
+}
+
+.refreshBtnActive {
+  opacity: 0.6;
+  pointer-events: none;
+}

@@ -1,0 +1,84 @@
+@use '@/styles/variables.scss' as *;
+
+.card {
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-card;
+  padding: 32rpx;
+  margin-bottom: $spacing-md;
+}
+
+.topRow {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.category {
+  font-size: 20rpx;
+  color: $color-primary-dark;
+  background: #fff4dd;
+  padding: 4rpx 16rpx;
+  border-radius: $radius-xs;
+}
+
+.sourceBadge {
+  font-size: 18rpx;
+  padding: 4rpx 14rpx;
+  border-radius: $radius-xs;
+  margin-left: 12rpx;
+  font-weight: $font-weight-medium;
+}
+
+.source_daily {
+  color: #0d9488;
+  background: #ccfbf1;
+}
+
+.source_ai {
+  color: #7c3aed;
+  background: #ede9fe;
+}
+
+.content {
+  display: block;
+  font-size: $font-size-lg;
+  font-weight: $font-weight-medium;
+  color: $color-text-primary;
+  line-height: $line-height-loose;
+  margin-bottom: 20rpx;
+}
+
+.bottomRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-sm;
+}
+
+.note {
+  flex: 1;
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  line-height: $line-height-normal;
+  @include text-ellipsis-multi(2);
+}
+
+.useBtn {
+  @include button-reset;
+  flex-shrink: 0;
+  min-width: 168rpx;
+  height: $button-height-sm;
+  border-radius: $radius-button;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: $color-on-primary;
+  background: $color-gradient-primary;
+  border: none;
+  white-space: nowrap;
+
+  &:active {
+    opacity: 0.85;
+    transform: scale(0.98);
+  }
+}

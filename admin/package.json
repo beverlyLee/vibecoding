@@ -1,0 +1,13 @@
+{
+  "name": "zuitiya-admin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "嘴替鸭小程序后台管理系统（零依赖 Node 服务 + 原生 JS 管理面板）",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}

@@ -1,0 +1,94 @@
+@use '@/styles/variables.scss' as *;
+
+.card {
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: 32rpx;
+  box-shadow: $shadow-card;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: $spacing-md;
+}
+
+.titleWrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.titleLabel {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-bottom: 8rpx;
+}
+
+.intentList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+}
+
+.intentTag {
+  font-size: 32rpx;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  background: $color-primary-light;
+  padding: 4rpx 20rpx;
+  border-radius: $radius-round;
+}
+
+.badges {
+  display: flex;
+  align-items: center;
+}
+
+.intensityBadge {
+  display: flex;
+  align-items: center;
+  padding: 6rpx 16rpx;
+  border-radius: $radius-round;
+}
+
+.dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: $radius-round;
+  margin-right: 8rpx;
+}
+
+.intensityText {
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+}
+
+.situation {
+  font-size: $font-size-md;
+  color: $color-text-secondary;
+  line-height: $line-height-loose;
+  padding: 20rpx 24rpx;
+  background: $color-bg-hover;
+  border-radius: $radius-md;
+  margin-bottom: $spacing-md;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sourceText {
+  font-size: $font-size-xs;
+  color: $color-primary-dark;
+  background: #fff4dd;
+  padding: 4rpx 16rpx;
+  border-radius: $radius-xs;
+}
+
+.costText {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+}

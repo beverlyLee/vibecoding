@@ -1,0 +1,157 @@
+@use '@/styles/variables.scss' as *;
+
+.card {
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-card;
+  margin-bottom: $spacing-md;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 32rpx;
+  transition: background-color $transition-fast;
+
+  &:active {
+    background: $color-bg-hover;
+  }
+}
+
+.headerLeft {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.category {
+  align-self: flex-start;
+  font-size: 20rpx;
+  color: $color-primary-dark;
+  background: #fff4dd;
+  padding: 4rpx 16rpx;
+  border-radius: $radius-xs;
+  margin-bottom: 12rpx;
+}
+
+.title {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  margin-bottom: 8rpx;
+  @include text-ellipsis;
+}
+
+.desc {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  @include text-ellipsis;
+}
+
+.arrow {
+  font-size: $font-size-lg;
+  color: $color-text-tertiary;
+  transition: transform $transition-base;
+  margin-left: $spacing-sm;
+}
+
+.arrowExpanded {
+  transform: rotate(180deg);
+}
+
+.body {
+  padding: 0 32rpx 32rpx;
+  border-top: 1rpx solid $color-divider;
+}
+
+.sectionLabel {
+  display: block;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: $color-text-secondary;
+  margin: 24rpx 0 16rpx;
+}
+
+.lineItem {
+  display: flex;
+  align-items: center;
+  background: $color-bg-hover;
+  border-radius: $radius-md;
+  padding: 20rpx 24rpx;
+  margin-bottom: $spacing-sm;
+}
+
+.lineText {
+  flex: 1;
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  line-height: $line-height-normal;
+  margin-right: $spacing-sm;
+}
+
+.copyBtn {
+  @include button-reset;
+  min-width: 104rpx;
+  height: $button-height-sm;
+  border-radius: $radius-button;
+  font-size: $font-size-sm;
+  color: $color-on-primary;
+  background: $color-gradient-primary;
+  border: none;
+  white-space: nowrap;
+
+  &:active {
+    opacity: 0.85;
+  }
+}
+
+.followup {
+  margin-bottom: $spacing-md;
+}
+
+.triggerRow,
+.replyRow {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 12rpx;
+}
+
+.roleTag {
+  flex-shrink: 0;
+  font-size: 20rpx;
+  color: $color-text-tertiary;
+  background: $color-divider;
+  border-radius: $radius-xs;
+  padding: 4rpx 12rpx;
+  margin-right: $spacing-sm;
+  margin-top: 4rpx;
+}
+
+.roleTagMe {
+  flex-shrink: 0;
+  font-size: 20rpx;
+  color: $color-on-primary;
+  background: $color-primary-light;
+  border-radius: $radius-xs;
+  padding: 4rpx 12rpx;
+  margin-right: $spacing-sm;
+  margin-top: 4rpx;
+}
+
+.triggerText {
+  flex: 1;
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  line-height: $line-height-normal;
+}
+
+.replyText {
+  flex: 1;
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  font-weight: $font-weight-medium;
+  line-height: $line-height-normal;
+}

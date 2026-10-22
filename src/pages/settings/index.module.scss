@@ -1,0 +1,259 @@
+@use '@/styles/variables.scss' as *;
+
+.page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #fff3d6 0%, $color-bg-page 400rpx);
+  padding: 24rpx $page-padding 48rpx;
+}
+
+// 引擎状态卡
+.statusCard {
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-card;
+  padding: 32rpx;
+  margin-bottom: $spacing-lg;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.statusLeft {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.statusLabel {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-bottom: 8rpx;
+}
+
+.statusValue {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  @include text-ellipsis;
+}
+
+.statusDesc {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-top: 8rpx;
+}
+
+.disableBtn {
+  @include button-reset;
+  flex-shrink: 0;
+  min-width: 176rpx;
+  height: $button-height-sm;
+  border-radius: $radius-button;
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  background: $color-divider;
+  border: none;
+  margin-left: $spacing-sm;
+
+  &:active {
+    opacity: 0.85;
+  }
+}
+
+// 分组标题
+.sectionTitle {
+  display: block;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: $color-text-secondary;
+  margin: 0 8rpx 16rpx;
+}
+
+// 厂商卡片
+.vendorCard {
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-card;
+  margin-bottom: $spacing-md;
+  overflow: hidden;
+}
+
+.vendorHeader {
+  display: flex;
+  align-items: center;
+  padding: 28rpx 32rpx;
+  transition: background-color $transition-fast;
+
+  &:active {
+    background: $color-bg-hover;
+  }
+}
+
+.vendorIcon {
+  @include flex-center;
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: $radius-md;
+  background: linear-gradient(135deg, #fff4dd 0%, #ffe8b3 100%);
+  font-size: 36rpx;
+  margin-right: $spacing-md;
+  flex-shrink: 0;
+}
+
+.vendorInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.vendorNameRow {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+}
+
+.vendorName {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+}
+
+.activeBadge {
+  font-size: 20rpx;
+  color: $color-success;
+  background: #e8ffea;
+  border: 1rpx solid $color-success;
+  border-radius: $radius-xs;
+  padding: 2rpx 12rpx;
+  white-space: nowrap;
+}
+
+.vendorMeta {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-top: 6rpx;
+  @include text-ellipsis;
+}
+
+.expandArrow {
+  font-size: $font-size-lg;
+  color: $color-text-tertiary;
+  transition: transform $transition-base;
+}
+
+.expandArrowOpen {
+  transform: rotate(180deg);
+}
+
+// 表单
+.form {
+  padding: 0 32rpx 32rpx;
+  border-top: 1rpx solid $color-divider;
+}
+
+.field {
+  margin-top: $spacing-md;
+}
+
+.fieldLabel {
+  display: block;
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  margin-bottom: 12rpx;
+}
+
+.fieldInput {
+  width: 100%;
+  height: $button-height-md;
+  background: $color-divider;
+  border-radius: $radius-md;
+  padding: 0 24rpx;
+  font-size: $font-size-md;
+  color: $color-text-primary;
+}
+
+.fieldTip {
+  display: block;
+  font-size: 20rpx;
+  color: $color-text-disabled;
+  margin-top: 8rpx;
+  @include text-ellipsis;
+}
+
+.formActions {
+  display: flex;
+  gap: $spacing-sm;
+  margin-top: $spacing-lg;
+}
+
+.formBtn {
+  @include button-reset;
+  flex: 1;
+  height: $button-height-md;
+  border-radius: $radius-button;
+  font-size: $font-size-md;
+  font-weight: $font-weight-medium;
+  color: #ffffff;
+  background: #5a6268;
+  border: none;
+  transition: all $transition-fast;
+
+  &:active {
+    opacity: 0.85;
+    transform: scale(0.98);
+  }
+}
+
+.saveBtn {
+  color: $color-on-primary;
+  background: $color-gradient-primary;
+  font-weight: $font-weight-semibold;
+}
+
+.useBtn {
+  color: $color-text-white;
+  background: $color-info;
+}
+
+.stopBtn {
+  color: #ffffff;
+  background: #6c757d;
+}
+
+.testing {
+  opacity: 0.6;
+}
+
+// 测试结果
+.testResult {
+  margin-top: $spacing-md;
+  padding: 20rpx 24rpx;
+  border-radius: $radius-md;
+  font-size: $font-size-sm;
+  line-height: $line-height-normal;
+  background: $color-divider;
+}
+
+.testOk {
+  background: #e8ffea;
+  color: $color-success;
+}
+
+.testFail {
+  background: #ffece8;
+  color: $color-error;
+}
+
+// 底部说明
+.notes {
+  margin-top: $spacing-xl;
+  padding: 0 8rpx;
+}
+
+.noteItem {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  line-height: $line-height-loose;
+  margin-bottom: 8rpx;
+}
