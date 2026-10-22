@@ -1,0 +1,6 @@
+# 火山方舟 API 不返回 CORS 头，浏览器无法直连 —— 由平台边缘节点转发。
+# 顺序敏感：代理规则必须排在 SPA 回退之前（_redirects 自上而下首次匹配生效）。
+/proxy-ark/*  https://ark.cn-beijing.volces.com/:splat  200
+
+# SPA 回退：任意路径返回 index.html，交由前端路由处理
+/*            /index.html                                200

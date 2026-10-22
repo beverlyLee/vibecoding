@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/proxy-ark/:path*",
+      "destination": "https://ark.cn-beijing.volces.com/:path*"
+    }
+  ]
+}
