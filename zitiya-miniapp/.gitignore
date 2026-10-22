@@ -1,0 +1,43 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+.taro/
+.npm/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# python
+__pycache__/
+*.pyc
+
+# IDE / AI tooling
+.pai/
+.trae/
+.cursor/
+.vscode/
+.idea/
+.DS_Store
+
+# editor
+
+# logs
+*.log
+npm-debug.log*
+
+# cache
+.cache/
+.parcel-cache/
+.swc/
+
+# local data
+*.db
+*.sqlite
+*.sqlite3
+
+# testing
+coverage/
