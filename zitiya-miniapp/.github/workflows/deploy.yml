@@ -1,0 +1,47 @@
+name: Deploy ZuiTiYa MiniProgram
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build weapp
+        run: npm run build:weapp
+
+      - name: Decode upload key
+        run: echo "${{ secrets.WECHAT_UPLOAD_KEY }}" | base64 -d > ./private.key
+
+      - name: Upload mini program
+        run: |
+          npx miniprogram-ci upload \
+            --pp . \
+            --pkp ./private.key \
+            --appid ${{ secrets.WECHAT_APPID }} \
+            --uv "${GITHUB_REF_NAME#v}" \
+            --ud "CI 自动上传 ${GITHUB_REF_NAME}" \
+            --r 1
+
+      - name: Deploy cloud functions
+        env:
+          TCB_ENV_ID: ${{ secrets.TCB_ENV_ID }}
+        run: |
+          npm i -g @cloudbase/cli
+          tcb login --apiKeyId "${{ secrets.TCB_API_KEY_ID }}" --apiKey "${{ secrets.TCB_API_KEY }}"
+          for fn in daily_crawler get_daily_quotes; do
+            tcb fn deploy "$fn" -e "$TCB_ENV_ID" --dir "cloudfunctions/$fn" --install-dependency true --yes
+          done

@@ -41,3 +41,8 @@ npm-debug.log*
 
 # testing
 coverage/
+
+# 微信小程序上传私钥（等同密码，禁止入库）
+*.key
+private.key
+scripts/private.key

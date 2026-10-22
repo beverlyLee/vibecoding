@@ -1,0 +1,10 @@
+{
+  "name": "get_daily_quotes",
+  "version": "1.0.0",
+  "private": true,
+  "description": "嘴替鸭每日语录读取云函数",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}
