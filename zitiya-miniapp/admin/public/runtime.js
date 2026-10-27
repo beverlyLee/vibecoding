@@ -7,6 +7,7 @@ Object.assign(App, {
     const mp = await this.api('GET', '/api/model-params');
     const ttl = await this.api('GET', '/api/daily-ttl');
     const limit = await this.api('GET', '/api/daily-limit');
+    const apiBase = await this.api('GET', '/api/api-base');
     const purposeLabel = {
       default: '全局兜底 default',
       analyze: '拆招分析 analyze',
@@ -49,7 +50,15 @@ Object.assign(App, {
         <input class="input" type="number" step="1" min="1" max="500" id="daily_limit" value="${limit}">
         <span class="hint">默认 100 条；云函数 daily_crawler 排序取 Top N 入库。点「立即抓取一次」也会带上此值</span>
       </div>
-      <button class="btn" data-action="saveDailyLimit">保存上限</button>`;
+      <button class="btn" data-action="saveDailyLimit">保存上限</button>
+
+      <h2 class="section-title" style="margin-top:24px">后端 API 地址</h2>
+      <div class="field" style="max-width:420px">
+        <label>FastAPI 数据服务器地址</label>
+        <input class="input" id="api_base" value="${apiBase}">
+        <span class="hint">小程序/H5 数据链路打这个地址（FastAPI :8080）。公网部署填公网 https 地址；H5 也可用构建期 API_BASE 覆盖</span>
+      </div>
+      <button class="btn" data-action="saveApiBase">保存后端地址</button>`;
   },
 
   async saveModelParams() {
@@ -83,5 +92,12 @@ Object.assign(App, {
     const res = await this.api('PUT', '/api/daily-limit', { limit: v });
     if (res && res.ok === false) { this.toast('失败：' + (res.msg || '')); return; }
     this.toast('每日入库上限已保存为 ' + (res != null ? res : v) + ' 条');
+  },
+
+  async saveApiBase() {
+    const v = document.getElementById('api_base').value;
+    const res = await this.api('PUT', '/api/api-base', { apiBase: v });
+    if (res && res.ok === false) { this.toast('失败：' + (res.msg || '')); return; }
+    this.toast('后端地址已保存为 ' + (res || v));
   }
 });

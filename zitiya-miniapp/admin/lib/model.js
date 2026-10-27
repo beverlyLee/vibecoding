@@ -33,6 +33,7 @@ const DEFAULT_MODEL_PARAMS = {
 
 const DEFAULT_DAILY_TTL_DAYS = 7;
 const DEFAULT_DAILY_LIMIT = 100; // 云函数 daily_crawler 每天最多入库条数
+const DEFAULT_API_BASE = 'http://localhost:8080'; // 小程序/H5 数据服务器（FastAPI）默认地址
 
 // ---- 默认值（从源码提取，启动时缓存）----
 let _defaults = null;
@@ -91,7 +92,8 @@ function emptyPatch() {
     attackCategories: [],     // 出招分类覆盖（非空则整体替换）
     modelParams: {},          // 模型参数档位覆盖（default/analyze/quoteGen/rephrase/test）
     dailyQuoteTTLDays: undefined, // 每日语录 TTL（天）
-    dailyQuoteLimit: undefined  // 云函数每日入库上限（条）
+    dailyQuoteLimit: undefined, // 云函数每日入库上限（条）
+    apiBase: undefined           // 后端 API 基地址（FastAPI），公网/H5 部署时覆盖
   };
 }
 
@@ -257,7 +259,8 @@ const api = {
         attackCategories: (patch.attackCategories || []).length,
         modelParams: Object.keys(patch.modelParams || {}).length,
         dailyQuoteTTLDays: patch.dailyQuoteTTLDays != null ? patch.dailyQuoteTTLDays : '(default)',
-        dailyQuoteLimit: patch.dailyQuoteLimit != null ? patch.dailyQuoteLimit : '(default)'
+        dailyQuoteLimit: patch.dailyQuoteLimit != null ? patch.dailyQuoteLimit : '(default)',
+        apiBase: patch.apiBase || '(default)'
       },
       totals: {
         intents: intents.length,
@@ -581,6 +584,19 @@ const api = {
     return patch.dailyQuoteLimit;
   },
 
+  getApiBase() {
+    const patch = loadPatch();
+    return patch.apiBase || DEFAULT_API_BASE;
+  },
+  setApiBase(base) {
+    const patch = loadPatch();
+    const v = (base || '').trim();
+    if (!v) return { ok: false, msg: '后端地址不能为空' };
+    patch.apiBase = v;
+    savePatch(patch);
+    return patch.apiBase;
+  },
+
   // ---- 出招场景库 ----
   listAttackScenes() {
     const { d, patch } = state();
@@ -731,7 +747,8 @@ const api = {
       attackCategories: patch.attackCategories && patch.attackCategories.length ? patch.attackCategories : undefined,
       modelParams: patch.modelParams && Object.keys(patch.modelParams).length ? patch.modelParams : undefined,
       dailyQuoteTTLDays: patch.dailyQuoteTTLDays != null ? patch.dailyQuoteTTLDays : undefined,
-      dailyQuoteLimit: patch.dailyQuoteLimit != null ? patch.dailyQuoteLimit : undefined
+      dailyQuoteLimit: patch.dailyQuoteLimit != null ? patch.dailyQuoteLimit : undefined,
+      apiBase: patch.apiBase != null ? patch.apiBase : undefined
     };
     return out;
   },
@@ -753,7 +770,8 @@ const api = {
       attackCategories: patch.attackCategories && patch.attackCategories.length ? patch.attackCategories : undefined,
       modelParams: patch.modelParams && Object.keys(patch.modelParams).length ? patch.modelParams : undefined,
       dailyQuoteTTLDays: patch.dailyQuoteTTLDays != null ? patch.dailyQuoteTTLDays : undefined,
-      dailyQuoteLimit: patch.dailyQuoteLimit != null ? patch.dailyQuoteLimit : undefined
+      dailyQuoteLimit: patch.dailyQuoteLimit != null ? patch.dailyQuoteLimit : undefined,
+      apiBase: patch.apiBase != null ? patch.apiBase : undefined
     };
   },
 

@@ -30,6 +30,69 @@ export const DEFAULT_CRAWL_TOPICS: string[] = [
   '嘴替'
 ];
 
+// 云端 scene_config 集合 _id='main' 的结构
+interface CloudSceneConfig {
+  _id?: string;
+  intents?: IntentRule[];
+  fixed_quotes?: Quote[];
+  crawl_topics?: string[];
+  daily_quote_limit?: number;
+  daily_quote_ttl_days?: number;
+  api_base?: string;
+  prompts?: Record<string, string>;
+  model_params?: Record<string, { temperature?: number; maxTokens?: number; timeout?: number }>;
+  presets?: LLMPreset[];
+  attack_scenes?: AttackScene[];
+  attack_categories?: string[];
+}
+
+// 云端配置缓存 + 加载状态
+let _cloudConfig: CloudSceneConfig | null = null;
+let _cloudLoadPromise: Promise<void> | null = null;
+
+/**
+ * 启动时调一次：从云数据库 scene_config.doc('main') 加载全量配置
+ * 只有微信小程序环境有 wx.cloud，H5 跳过（用代码默认值）
+ * 失败不阻塞，继续用代码默认值
+ */
+export function initCloudConfig(): Promise<void> {
+  if (_cloudConfig) return Promise.resolve();
+  if (_cloudLoadPromise) return _cloudLoadPromise;
+
+  _cloudLoadPromise = (async () => {
+    try {
+      // 小程序：读云数据库 scene_config.doc('main')
+      if (process.env.TARO_ENV === 'weapp' && typeof Taro !== 'undefined' && Taro.cloud) {
+        const db = Taro.cloud.database();
+        const res = await db.collection('scene_config').doc('main').get();
+        const data = res.data as CloudSceneConfig;
+        if (data && (data.intents?.length || data.fixed_quotes?.length)) {
+          _cloudConfig = data;
+          console.log('[SceneConfig] ✅ 云端配置加载:',
+            (data.intents?.length || 0), '个意图,',
+            (data.fixed_quotes?.length || 0), '条语录,',
+            (data.crawl_topics?.length || 0), '个话题'
+          );
+          return;
+        }
+      }
+      // H5 或小程序云数据没配 → 用代码默认
+      console.log('[SceneConfig] 使用代码默认配置');
+      _cloudConfig = null;
+    } catch (err: any) {
+      console.warn('[SceneConfig] 云端加载失败（用默认值）:', err?.message || err);
+      _cloudConfig = null;
+    }
+  })();
+
+  return _cloudLoadPromise;
+}
+
+/** 当前是否已从云端加载到配置 */
+export function isCloudConfigLoaded(): boolean {
+  return _cloudConfig !== null;
+}
+
 // 用户可覆盖/新增的数据结构
 interface SceneConfigPatch {
   // 某个意图的关键词覆盖（整个替换数组，不是追加）
@@ -60,6 +123,8 @@ interface SceneConfigPatch {
   dailyQuoteTTLDays?: number;
   // 云函数 daily_crawler 每天最多入库条数（默认 100）
   dailyQuoteLimit?: number;
+  // 后端 API 基地址（FastAPI 数据服务器），默认 http://localhost:8080，可通过后台/导出覆盖
+  apiBase?: string;
 }
 
 // LLM system prompt 默认值 —— 可被 Storage.prompts 覆盖
@@ -109,6 +174,9 @@ export const DEFAULT_MODEL_PARAMS: Record<string, { temperature: number; maxToke
 
 export const DEFAULT_DAILY_TTL_DAYS = 7;
 
+// 后端 API 基地址（FastAPI 数据服务器）默认值
+export const DEFAULT_API_BASE = 'http://localhost:8080';
+
 let _cached: SceneConfigPatch | null = null;
 
 function defaultPatch(): SceneConfigPatch {
@@ -153,28 +221,37 @@ export function saveSceneConfig(patch: SceneConfigPatch): void {
 // 意图规则（默认 + 覆盖 + 新增）—— 引擎/漏斗全用这个
 // ================================================================
 
-/** 获取完整意图规则列表（默认 12 个 + 用户覆盖 + 用户新增） */
+/** 获取完整意图规则列表（云端 > 代码默认 > 用户覆盖 > 用户新增） */
 export function getAllIntentRules(): IntentRule[] {
   const patch = loadSceneConfig();
-  const merged: IntentRule[] = [];
 
-  for (const rule of INTENT_RULES) {
-    const kw = patch.keywordOverrides[rule.key] ?? patch.intentOverrides[rule.key]?.keywords ?? rule.keywords;
+  // 1. 基础：云端有就用云端，否则用代码默认
+  let base: IntentRule[] = _cloudConfig?.intents?.length
+    ? _cloudConfig.intents.map((r) => ({ ...r }))
+    : INTENT_RULES.map((r) => ({ ...r }));
+
+  // 2. 本地 Storage 覆盖叠上去（keywordOverrides + intentOverrides）
+  for (const rule of base) {
+    const kw = patch.keywordOverrides[rule.key] ?? rule.keywords;
     const override = patch.intentOverrides[rule.key];
     const { keywords: _kw, ...overrideWithoutKw } = override || {};
-    merged.push({
-      ...rule,
-      ...overrideWithoutKw,
-      keywords: kw
-    });
+    Object.assign(rule, overrideWithoutKw);
+    rule.keywords = kw;
   }
 
-  // 用户新增的意图直接追加
-  for (const custom of patch.customIntents) {
-    merged.push(custom);
+  // 3. 用户新增的意图直接追加
+  let result = [...base, ...patch.customIntents];
+
+  // 4. 确保 generic 兜底意图永远存在（云端覆盖了代码默认后可能丢失）
+  if (!result.some((r) => r.key === GENERIC_INTENT_KEY)) {
+    const fallback = INTENT_RULES.find((r) => r.key === GENERIC_INTENT_KEY);
+    if (fallback) {
+      console.warn('[SceneConfig] 注意到 generic 兜底意图缺失，从代码默认补上');
+      result.push({ ...fallback });
+    }
   }
 
-  return merged;
+  return result;
 }
 
 /** 按 key 取单个意图（默认 + 覆盖 + 新增） */
@@ -337,10 +414,13 @@ export function removeKeyword(intentKey: string, keyword: string): void {
 // 固定语录配置
 // ================================================================
 
-/** 获取完整固定语录库（默认 + 用户补充） */
+/** 获取完整固定语录库（云端 > 代码默认 + 用户补充） */
 export function getAllFixedQuotes(): Quote[] {
   const patch = loadSceneConfig();
-  return [...DEFAULT_QUOTES, ...patch.customQuotes];
+  const base: Quote[] = _cloudConfig?.fixed_quotes?.length
+    ? _cloudConfig.fixed_quotes.map((q) => ({ ...q }))
+    : [...DEFAULT_QUOTES];
+  return [...base, ...patch.customQuotes];
 }
 
 /** 新增一条固定语录 */
@@ -373,10 +453,12 @@ export function removeFixedQuote(id: string): boolean {
 // 爬虫话题配置（给云函数 daily_crawler 用）
 // ================================================================
 
-/** 获取完整爬虫话题列表（用户自定义优先，否则用默认） */
+/** 获取完整爬虫话题列表（用户本地覆盖 > 云端 > 代码默认） */
 export function getCrawlTopics(): string[] {
   const patch = loadSceneConfig();
-  return patch.crawlTopics?.length ? patch.crawlTopics : [...DEFAULT_CRAWL_TOPICS];
+  if (patch.crawlTopics?.length) return patch.crawlTopics;
+  if (_cloudConfig?.crawl_topics?.length) return [..._cloudConfig.crawl_topics];
+  return [...DEFAULT_CRAWL_TOPICS];
 }
 
 /** 设置完整话题列表（覆盖） */
@@ -417,7 +499,7 @@ const DEFAULT_DAILY_LIMIT = 100;
 const DEFAULT_TTL_DAYS = 7;
 
 export function getDailyQuoteLimit(): number {
-  return loadSceneConfig().dailyQuoteLimit ?? DEFAULT_DAILY_LIMIT;
+  return loadSceneConfig().dailyQuoteLimit ?? _cloudConfig?.daily_quote_limit ?? DEFAULT_DAILY_LIMIT;
 }
 export function setDailyQuoteLimit(n: number): void {
   const patch = loadSceneConfig();
@@ -426,7 +508,7 @@ export function setDailyQuoteLimit(n: number): void {
 }
 
 export function getDailyQuoteTTLDays(): number {
-  return loadSceneConfig().dailyQuoteTTLDays ?? DEFAULT_TTL_DAYS;
+  return loadSceneConfig().dailyQuoteTTLDays ?? _cloudConfig?.daily_quote_ttl_days ?? DEFAULT_TTL_DAYS;
 }
 export function setDailyQuoteTTLDays(d: number): void {
   const patch = loadSceneConfig();
@@ -473,12 +555,16 @@ export function dumpSceneConfig(): void {
 // LLM System Prompt 配置
 // ================================================================
 
-/** 获取完整 prompt map（默认 + 覆盖） */
+/** 获取完整 prompt map（默认 + 本地覆盖 + 云端后台覆盖） */
 export function getAllPrompts(): Record<string, string> {
   const patch = loadSceneConfig();
   const result: Record<string, string> = { ...DEFAULT_PROMPTS };
   if (patch.prompts) {
     Object.assign(result, patch.prompts);
+  }
+  // 云端后台(admin_config)配置优先
+  if (_cloudConfig?.prompts) {
+    Object.assign(result, _cloudConfig.prompts);
   }
   return result;
 }
@@ -516,12 +602,14 @@ export function resetPrompt(key: string): void {
 // 模型厂商预设配置（公开配置，不含 API Key）
 // ================================================================
 
-/** 获取完整厂商预设（默认 + 覆盖 + 新增），设置页与 Store 直接用 */
+/** 获取完整厂商预设（默认 + 本地覆盖/新增 + 云端后台覆盖/新增），设置页与 Store 直接用 */
 export function getLLMPresets(): LLMPreset[] {
   const patch = loadSceneConfig();
   const overrideMap: Record<string, LLMPreset> = {};
   const customs: LLMPreset[] = [];
-  for (const p of patch.presets || []) {
+  // 本地 Storage 与云端后台(admin_config)的预设合并后再叠加到代码默认
+  const allPresets = [...(patch.presets || []), ...(_cloudConfig?.presets || [])];
+  for (const p of allPresets) {
     if (LLM_PRESETS.some((d) => d.key === p.key)) overrideMap[p.key] = p;
     else customs.push(p);
   }
@@ -543,14 +631,16 @@ export function getAsrPresets(): LLMPreset[] {
 // ================================================================
 // 模型参数配置（默认档位 + 覆盖）
 
-/** 获取某用途档位的模型参数（默认 + 覆盖），llm/engine 读取 */
+/** 获取某用途档位的模型参数（默认 + 本地覆盖 + 云端后台覆盖），llm/engine 读取 */
 export function getModelParams(
   purpose = 'default'
 ): { temperature: number; maxTokens: number; timeout: number } {
   const patch = loadSceneConfig();
   const base = DEFAULT_MODEL_PARAMS[purpose] || DEFAULT_MODEL_PARAMS.default;
-  const override = patch.modelParams?.[purpose];
-  return { ...base, ...(override || {}) };
+  const local = patch.modelParams?.[purpose];
+  const cloud = _cloudConfig?.model_params?.[purpose];
+  // 优先级：云端后台(admin_config) > 本地 Storage 覆盖 > 代码默认
+  return { ...base, ...(local || {}), ...(cloud || {}) };
 }
 
 // ================================================================
@@ -563,25 +653,37 @@ export function getDailyQuoteTTLMs(): number {
   return Math.max(1, days) * 24 * 60 * 60 * 1000;
 }
 
+// 后端 API 基地址：小程序/H5 数据链路打这个地址（FastAPI :8080）
+// 公网/H5 部署时通过后台配置或构建期 API_BASE_URL 覆盖；云端后台(admin_config)配置优先于本地
+export function getApiBase(): string {
+  const cloud = _cloudConfig?.api_base?.trim();
+  if (cloud) return cloud;
+  const local = loadSceneConfig().apiBase?.trim();
+  return local || DEFAULT_API_BASE;
+}
+
 // ================================================================
 // 出招场景库配置（默认 ATTACK_SCENES + 覆盖/新增）
 
-/** 获取出招分类列表（默认 + 覆盖），保证 '全部' 永远排在第一位 */
+/** 获取出招分类列表（云端后台 > 本地覆盖 > 代码默认），保证 '全部' 永远排在第一位 */
 export function getAttackCategories(): string[] {
   const patch = loadSceneConfig();
+  const cloudCats = _cloudConfig?.attack_categories;
+  const localCats = patch.attackCategories;
   const base =
-    Array.isArray(patch.attackCategories) && patch.attackCategories.length > 0
-      ? patch.attackCategories
-      : ATTACK_CATEGORIES;
+    (Array.isArray(cloudCats) && cloudCats.length > 0) ? cloudCats
+    : (Array.isArray(localCats) && localCats.length > 0) ? localCats
+    : ATTACK_CATEGORIES;
   const cleaned = base.map((c) => String(c).trim()).filter(Boolean);
   const withoutAll = cleaned.filter((c) => c !== '全部');
   return ['全部', ...withoutAll];
 }
 
-/** 获取合并后的出招场景列表（默认 + 按 id 覆盖 + 自定义新增） */
+/** 获取合并后的出招场景列表（云端后台为基 > 代码默认，再叠加本地覆盖/自定义新增） */
 export function getAttackScenes(): AttackScene[] {
   const patch = loadSceneConfig();
-  const base = ATTACK_SCENES.map((s) => ({ ...s }));
+  const cloudScenes = _cloudConfig?.attack_scenes;
+  const base = (cloudScenes && cloudScenes.length ? cloudScenes : ATTACK_SCENES).map((s) => ({ ...s }));
   const overrides = patch.attackSceneOverrides || {};
   const merged = base.map((s) => (overrides[s.id] ? { ...s, ...overrides[s.id] } : s));
   const custom = patch.customAttackScenes || [];
@@ -621,6 +723,7 @@ if (typeof window !== 'undefined') {
     getAsrPresets,
     getModelParams,
     getDailyQuoteTTLMs,
+    getApiBase,
     getDailyQuoteLimit,
     setDailyQuoteLimit,
     getDailyQuoteTTLDays,

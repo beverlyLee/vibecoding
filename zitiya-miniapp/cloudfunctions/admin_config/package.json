@@ -1,0 +1,10 @@
+{
+  "name": "admin_config",
+  "version": "1.0.0",
+  "private": true,
+  "description": "嘴替鸭场景配置管理：意图/语录/话题/模型参数/每日参数/后端地址/出招场景/预设/提示词",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

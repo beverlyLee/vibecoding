@@ -1,0 +1,10 @@
+{
+  "name": "user",
+  "version": "1.0.0",
+  "private": true,
+  "description": "嘴替鸭用户体系：登录 / 档案 / 注销",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

@@ -1,7 +1,10 @@
-// 后端 HTTP 封装 —— 本地 FastAPI http://localhost:8080
-// 生产部署后改成你的服务器地址
+// 后端 HTTP 封装 —— FastAPI 数据服务器
+// 地址优先级：构建期注入的 API_BASE_URL（公网/H5 部署用）> sceneConfig 配置 > 默认 localhost:8080
 
-const API_BASE = 'http://localhost:8080';
+import { getApiBase } from './sceneConfig';
+
+declare const API_BASE_URL: string;
+const API_BASE = (typeof API_BASE_URL !== 'undefined' && API_BASE_URL) || getApiBase();
 
 export async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`);

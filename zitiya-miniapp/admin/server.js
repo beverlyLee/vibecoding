@@ -103,6 +103,8 @@ route('PUT', '/api/daily-ttl', async (_r, _res, _p, body) => api.setDailyTTL(bod
 // 每日入库上限（条）
 route('GET', '/api/daily-limit', async () => api.getDailyLimit());
 route('PUT', '/api/daily-limit', async (_r, _res, _p, body) => api.setDailyLimit(body.limit ?? body.dailyQuoteLimit ?? body));
+route('GET', '/api/api-base', async () => api.getApiBase());
+route('PUT', '/api/api-base', async (_r, _res, _p, body) => api.setApiBase(body.apiBase ?? body));
 
 // 爬虫手动触发（调用微信云函数 daily_crawler）
 route('GET', '/api/crawl/config', async () => crawl.getConfigMasked());

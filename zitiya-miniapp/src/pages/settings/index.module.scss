@@ -2,7 +2,7 @@
 
 .page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #fff3d6 0%, $color-bg-page 400rpx);
+  background: linear-gradient(180deg, #eaf1ff 0%, $color-bg-page 400rpx);
   padding: 24rpx $page-padding 48rpx;
 }
 
@@ -94,7 +94,7 @@
   width: 72rpx;
   height: 72rpx;
   border-radius: $radius-md;
-  background: linear-gradient(135deg, #fff4dd 0%, #ffe8b3 100%);
+  background: linear-gradient(135deg, #eef3ff 0%, #d6e4ff 100%);
   font-size: 36rpx;
   margin-right: $spacing-md;
   flex-shrink: 0;
@@ -150,6 +150,23 @@
 .form {
   padding: 0 32rpx 32rpx;
   border-top: 1rpx solid $color-divider;
+}
+
+// 隐私安心提示（配置不上传服务器）
+.privacyTip {
+  margin-top: $spacing-md;
+  padding: 18rpx 24rpx;
+  background: #e8ffea;
+  border: 1rpx solid $color-success;
+  border-radius: $radius-md;
+  display: flex;
+  align-items: center;
+}
+
+.privacyTipText {
+  font-size: $font-size-xs;
+  color: $color-success;
+  line-height: $line-height-normal;
 }
 
 .field {

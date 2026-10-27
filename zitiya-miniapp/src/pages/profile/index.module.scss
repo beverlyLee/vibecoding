@@ -1,0 +1,232 @@
+@use '@/styles/variables.scss' as *;
+
+.page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #eaf1ff 0%, $color-bg-page 400rpx);
+  padding: 24rpx $page-padding 120rpx;
+}
+
+// 游客态
+.guestCard {
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-xl;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: $shadow-card;
+  margin-bottom: $spacing-xl;
+}
+
+.guestLogo {
+  width: 128rpx;
+  height: 128rpx;
+  margin-bottom: $spacing-md;
+}
+
+.guestTitle {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  margin-bottom: $spacing-xs;
+}
+
+.guestDesc {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  text-align: center;
+  margin-bottom: $spacing-lg;
+  line-height: $line-height-loose;
+}
+
+.guestHint {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  margin-top: $spacing-md;
+}
+
+// 头卡片（已登录）
+.userCard {
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-xl;
+  display: flex;
+  align-items: center;
+  box-shadow: $shadow-card;
+  margin-bottom: $spacing-xl;
+}
+
+.avatarWrap {
+  position: relative;
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: $radius-round;
+  overflow: hidden;
+  background: $color-bg-hover;
+  flex-shrink: 0;
+  margin-right: $spacing-lg;
+}
+
+.avatar {
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: $radius-round;
+}
+
+.avatarPlaceholder {
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: $radius-round;
+  background: $color-gradient-primary;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 56rpx;
+  color: $color-on-primary;
+}
+
+.avatarEditHint {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: $font-size-xs;
+  text-align: center;
+  padding: 6rpx 0;
+}
+
+.userInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.nicknameRow {
+  display: flex;
+  align-items: center;
+  gap: $spacing-xs;
+  margin-bottom: $spacing-sm;
+}
+
+.nickname {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  @include text-ellipsis;
+  max-width: 360rpx;
+}
+
+.roleBadge {
+  font-size: $font-size-xs;
+  padding: 4rpx 16rpx;
+  border-radius: $radius-round;
+  line-height: 1.6;
+}
+
+.roleAdmin {
+  background: #fff2e8;
+  color: #d4380d;
+  border: 1rpx solid #ffbb96;
+}
+
+.roleOperator {
+  background: #e6f4ff;
+  color: #0958d9;
+  border: 1rpx solid #91caff;
+}
+
+.meta {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  line-height: $line-height-loose;
+}
+
+// 区块
+.sectionTitle {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  padding: $spacing-lg 8rpx $spacing-sm;
+  font-weight: $font-weight-medium;
+}
+
+.menuCard {
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  overflow: hidden;
+  box-shadow: $shadow-card;
+  margin-bottom: $spacing-lg;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  padding: $spacing-md $spacing-lg;
+  border-bottom: 1rpx solid $color-divider;
+  min-height: 88rpx;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:active {
+    background: $color-bg-hover;
+  }
+}
+
+.menuIcon {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: $radius-sm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  margin-right: $spacing-md;
+  flex-shrink: 0;
+}
+
+.menuIconAdmin { background: #fff2e8; }
+.menuIconPrivacy { background: #e6f4ff; }
+.menuIconLogout { background: #fff1f0; }
+
+.menuLabel {
+  flex: 1;
+  font-size: $font-size-md;
+  color: $color-text-primary;
+}
+
+.menuArrow {
+  font-size: $font-size-md;
+  color: $color-text-tertiary;
+}
+
+.menuValue {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  margin-right: $spacing-sm;
+}
+
+// 按钮
+.primaryBtn {
+  margin-top: $spacing-md;
+  width: 100%;
+  height: 88rpx;
+  background: $color-gradient-primary;
+  color: $color-on-primary;
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  border-radius: $radius-button;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+
+  &::after { border: none; }
+
+  &[disabled] {
+    background: #e0e0e0;
+    color: #999;
+    opacity: 0.6;
+  }
+}

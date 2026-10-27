@@ -45,10 +45,8 @@ export function matchInDailyPool(text: string): DailyPoolMatch {
   const hitKeywords = new Set<string>();
 
   for (const q of quotes) {
-    // 条件 1：有 intent_key
-    const hasIntent = !!q.intent_key;
-
-    // 条件 2/3：keywords 或 content 有交集
+    // 匹配条件：keywords 必须与输入有真实交集，杜绝"有 intent_key 就命中"的滥匹配
+    // （之前只要语录带 intent_key 就全捞进来，导致随便一句话都会命中无关意图）
     let kwHit = false;
     for (const kw of q.keywords || []) {
       if (kw && text.includes(kw)) {
@@ -57,7 +55,7 @@ export function matchInDailyPool(text: string): DailyPoolMatch {
       }
     }
 
-    if (hasIntent || kwHit) {
+    if (kwHit) {
       matched.push(q);
       if (q.intent_key) hitIntentKeys.add(q.intent_key);
     }

@@ -1,0 +1,10 @@
+{
+  "name": "admin_users",
+  "version": "1.0.0",
+  "private": true,
+  "description": "嘴替鸭用户管理：列表 / 封禁 / 删除 / 角色变更",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

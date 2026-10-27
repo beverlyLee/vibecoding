@@ -1,5 +1,7 @@
 export default defineAppConfig({
-  pages: ['pages/defend/index', 'pages/attack/index', 'pages/quotes/index', 'pages/settings/index'],
+  pages: ['pages/defend/index', 'pages/attack/index', 'pages/quotes/index', 'pages/settings/index', 'pages/profile/index', 'pages/privacy/index', 'pages/admin/index'],
+  // 组件按需注入（代码质量扫描要求）
+  lazyCodeLoading: 'requiredComponents',
   window: {
     backgroundTextStyle: 'light',
     navigationBarBackgroundColor: '#FFF9EF',
@@ -15,9 +17,9 @@ export default defineAppConfig({
   //     provider: 'wx069ba97219f66d99'
   //   }
   // },
-  // 录音权限声明
+  // 录音权限声明（微信合法 scope 为 scope.record，用于语音输入转文字）
   permission: {
-    'scope.userRecord': {
+    'scope.record': {
       desc: '用于语音输入，将你说的话转成文字'
     }
   },
@@ -50,6 +52,12 @@ export default defineAppConfig({
         text: '设置',
         iconPath: 'assets/tabbar/settings.png',
         selectedIconPath: 'assets/tabbar/settings-selected.png'
+      },
+      {
+        pagePath: 'pages/profile/index',
+        text: '我的',
+        iconPath: 'assets/tabbar/profile.png',
+        selectedIconPath: 'assets/tabbar/profile-selected.png'
       }
     ]
   }

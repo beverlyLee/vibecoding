@@ -1,0 +1,9 @@
+{
+  "name": "get_scene_config",
+  "version": "1.0.0",
+  "description": "返回场景配置，供小程序和H5双端共用",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

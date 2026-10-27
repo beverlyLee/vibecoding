@@ -21,15 +21,56 @@ export function isTodayFetched(): boolean {
 }
 
 /**
- * 拉取每日语录：调后端 GET /api/quotes
- * 后端已完成 爬虫→关键词过滤→综合排序→Top N，前端只做二次 annotate + 去重
- * 后端没跑起来就返回 []
+ * 拉取每日语录
+ * 所有环境统一调 HTTP API（前后端分离）
+ * 后端 FastAPI 的 /api/quotes 接口
  */
+// 后端 API 地址（仅 H5 用；weapp 走云函数不经过这里）
+// 注意：不能用 process.env.API_BASE —— Taro 只注入 TARO_ENV/NODE_ENV，
+// 未定义的 env 键会原样保留，而 weapp/H5 运行时都没有 process 全局，直接 ReferenceError 白屏
+// 后端部署后直接改这个常量
+const API_BASE = 'http://localhost:8080';
+
 export async function fetchDailyQuotes(): Promise<Quote[]> {
+  // 微信小程序环境：走云函数（零成本、免备案、动态后端）
+  if (process.env.TARO_ENV === 'weapp') {
+    try {
+      const res: any = await Taro.cloud.callFunction({
+        name: 'get_daily_quotes',
+        data: { limit: 100 },
+      });
+      const rows: any[] = res?.result?.data || [];
+      if (!rows.length) {
+        console.log('[QuoteCache] 云函数返回 0 条（爬虫可能还没跑或云环境未初始化）');
+        return [];
+      }
+      const quotes: Quote[] = rows.map((r) => ({
+        id: r.id,
+        content: r.content,
+        source: 'daily',
+        category: r.category || '社区热话',
+        keywords: r.keywords || [],
+        intent_key: r.intent_key || null,
+        fetched_at: r.fetched_at,
+        note: r.note,
+      }));
+      console.log('[QuoteCache] 云函数返回', quotes.length, '条');
+      return quotes;
+    } catch (err) {
+      console.warn('[QuoteCache] 云函数调用失败:', err instanceof Error ? err.message : err);
+      return [];
+    }
+  }
+
+  // H5 / 其他环境：走 HTTP 后端（后端未部署时降级为空）
   try {
-    const rows = await apiGet<any[]>("/api/quotes?limit=100");
+    const url = `${API_BASE}/api/quotes?limit=100`;
+    const res = await Taro.request({ url, method: 'GET', timeout: 8000 });
+    const rows: any[] = res.data as any[] || [];
+    console.log('[QuoteCache] HTTP API 返回', rows.length, '条');
+
     if (!rows || rows.length === 0) {
-      console.log("[QuoteCache] 后端 /api/quotes 返回 0 条（爬虫可能还没跑）");
+      console.log("[QuoteCache] 返回 0 条（爬虫可能还没跑）");
       return [];
     }
     const quotes: Quote[] = rows.map((r) => ({

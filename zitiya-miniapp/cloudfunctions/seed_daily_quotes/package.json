@@ -1,0 +1,9 @@
+{
+  "name": "seed_daily_quotes",
+  "version": "1.0.0",
+  "description": "一次性种子语料灌库",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

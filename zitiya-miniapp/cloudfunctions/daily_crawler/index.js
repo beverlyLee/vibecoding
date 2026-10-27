@@ -4,9 +4,37 @@
 // 入库策略：按 (点赞数 × 0.6 + 关键词匹配度 × 0.4) 综合排序 → 取 Top N（默认 100，可配置）
 
 const cloud = require('wx-server-sdk');
+const https = require('https');
+const http = require('http');
+const { URL } = require('url');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
+
+// Node.js 原生 HTTP 请求（替代不存在的 cloud.httpRequest）
+function nodeHttpRequest(opts) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(opts.url);
+    const lib = url.protocol === 'https:' ? https : http;
+    const reqOpts = {
+      hostname: url.hostname,
+      port: url.port || (url.protocol === 'https:' ? 443 : 80),
+      path: url.pathname + url.search,
+      method: opts.method || 'GET',
+      headers: opts.headers || {}
+    };
+    const req = lib.request(reqOpts, (res) => {
+      let body = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => resolve({ statusCode: res.statusCode, body }));
+    });
+    req.on('error', reject);
+    req.setTimeout(opts.timeout || 10000, () => { req.destroy(); reject(new Error('timeout')); });
+    if (opts.body) req.write(opts.body);
+    req.end();
+  });
+}
 
 const DEFAULT_TOPICS = [
   '接话技巧', '高情商说话', '回话的技术', '怎么拒绝', '拒绝别人',
@@ -31,16 +59,18 @@ async function loadSceneConfig() {
 }
 
 async function loadTopics(cfg) {
-  if (cfg.crawlTopics?.length > 0) {
-    console.log('[Crawler] 使用自定义话题:', cfg.crawlTopics);
-    return cfg.crawlTopics;
+  // 兼容驼峰（crawlTopics）与蛇形（crawl_topics，与前端 scene_config 文档一致）
+  const custom = (cfg.crawlTopics?.length ? cfg.crawlTopics : cfg.crawl_topics) || [];
+  if (custom.length > 0) {
+    console.log('[Crawler] 使用自定义话题:', custom);
+    return custom;
   }
   console.log('[Crawler] 使用默认话题:', DEFAULT_TOPICS);
   return DEFAULT_TOPICS;
 }
 
 async function loadDailyLimit(cfg) {
-  const n = Number(cfg.dailyQuoteLimit);
+  const n = Number(cfg.dailyQuoteLimit || cfg.daily_quote_limit);
   if (n > 0) {
     console.log('[Crawler] 每日入库条数:', n);
     return n;
@@ -50,7 +80,7 @@ async function loadDailyLimit(cfg) {
 }
 
 async function loadTTLDays(cfg) {
-  const d = Number(cfg.dailyQuoteTTLDays);
+  const d = Number(cfg.dailyQuoteTTLDays || cfg.daily_quote_ttl_days);
   if (d > 0) {
     console.log('[Crawler] 使用自定义 TTL 天数:', d);
     return d;
@@ -74,7 +104,8 @@ const DEFAULT_RULES = [
 ];
 
 function loadKeywordMap(cfg) {
-  const overrides = cfg.keywordOverrides || {};
+  // 兼容驼峰与蛇形字段
+  const overrides = cfg.keywordOverrides || cfg.keyword_overrides || {};
   const map = {};
   for (const r of DEFAULT_RULES) {
     map[r.key] = overrides[r.key] || r.keywords;
@@ -128,7 +159,7 @@ async function crawlWeiboTopic(topic) {
   const url = `https://s.weibo.com/weibo?q=${encodeURIComponent(topic)}&typeall=1&suball=1&timescope=custom:1:0`;
 
   try {
-    const res = await cloud.httpRequest({
+    const res = await nodeHttpRequest({
       url,
       method: 'GET',
       headers: {

@@ -11,7 +11,7 @@
     "compileHotReLoad": false,
     "postcss": false,
     "preloadBackgroundData": false,
-    "minified": false,
+    "minified": true,
     "newFeature": true,
     "autoAudits": false,
     "coverView": true,
@@ -42,8 +42,13 @@
   "simulatorPluginLibVersion": {},
   "condition": {},
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      { "type": "glob", "value": "**/*.md" }
+    ],
     "include": []
   },
-  "editorSetting": {}
+  "editorSetting": {},
+  "libVersion": "3.17.4",
+  "cloudfunctionTemplateRoot": "cloudfunctionTemplate/",
+  "__usePrivacyCheck__": true
 }

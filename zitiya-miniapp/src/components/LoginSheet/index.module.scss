@@ -1,0 +1,99 @@
+@use '@/styles/variables.scss' as *;
+
+.mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.sheet {
+  background: $color-bg-card;
+  border-radius: 32rpx 32rpx 0 0;
+  padding: 48rpx $spacing-lg calc($spacing-xl + env(safe-area-inset-bottom));
+  animation: slideUp 0.25s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.privacyRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 48rpx;
+}
+
+.checkbox {
+  width: 32rpx;
+  height: 32rpx;
+  border: 2rpx solid $color-text-tertiary;
+  border-radius: 6rpx;
+  margin-right: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.checkboxChecked {
+  background: $color-gradient-primary;
+  border-color: $color-gradient-primary;
+}
+
+.checkboxTick {
+  font-size: 24rpx;
+  color: #fff;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.privacyText {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+}
+
+.privacyLink {
+  color: $color-gradient-primary;
+  text-decoration: underline;
+}
+
+.loginBtn {
+  width: 100%;
+  height: 96rpx;
+  background: $color-gradient-primary;
+  color: $color-on-primary;
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  border-radius: $radius-button;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &::after { border: none; }
+
+  &[disabled] {
+    background: #e0e0e0;
+    color: #999;
+    opacity: 0.6;
+  }
+}
+
+.cancelBtn {
+  width: 100%;
+  height: 80rpx;
+  background: transparent;
+  color: $color-text-tertiary;
+  font-size: $font-size-sm;
+  border: none;
+  margin-top: 16rpx;
+
+  &::after { border: none; }
+}

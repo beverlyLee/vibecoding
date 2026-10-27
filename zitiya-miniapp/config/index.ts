@@ -18,7 +18,10 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
     sourceRoot: 'src',
     outputRoot: process.env.TARO_OUTPUT_DIR || 'dist',
     plugins: ['@tarojs/plugin-html'],
-    defineConstants: {},
+    defineConstants: {
+      // 构建期注入后端地址：API_BASE=https://your-fastapi.example.com taro build --type h5
+      API_BASE_URL: JSON.stringify(process.env.API_BASE || '')
+    },
     copy: {
       patterns: [],
       options: {},

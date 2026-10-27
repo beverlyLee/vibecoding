@@ -7,6 +7,8 @@ import ResponseCard from '@/components/ResponseCard';
 import EmptyState from '@/components/EmptyState';
 import { analyzeUtterance, rephraseResponse, copyText } from '@/services/engine';
 import { useAppStore } from '@/store/useAppStore';
+import { useUserStore } from '@/store/useUserStore';
+import { useLoginSheet } from '@/hooks/useLoginSheet';
 import type { AnalysisResult, Response } from '@/types/analysis';
 import logoDuck from '@/assets/logo.png';
 import styles from './index.module.scss';
@@ -47,12 +49,19 @@ export default function DefendPage() {
   const [rephrasingId, setRephrasingId] = useState<string | null>(null);
   const activeLLM = useAppStore((s) => s.getActiveLLM());
   const clearPendingQuote = useAppStore((s) => s.clearPendingQuote);
+  const requireLogin = useUserStore((s) => s.requireLogin);
+  const loginSheet = useLoginSheet();
 
   // 页面显示时检查语录回填
   useDidShow(() => {
     const quote = useAppStore.getState().pendingQuote;
     if (quote) {
       console.log('[API] DefendPage.useDidShow ← 检测到语录回填:', quote.slice(0, 40));
+      // 语录回填触发的分析也需要登录，保持体验一致
+      if (!requireLogin('生成回话')) {
+        clearPendingQuote(); // 未登录就清掉，避免下次还触发
+        return;
+      }
       setInputText(quote);
       runAnalyze(quote, '语录回填');
       clearPendingQuote();
@@ -82,6 +91,7 @@ export default function DefendPage() {
     const text = inputText.trim();
     console.log('[API] DefendPage.handleSubmit ← 「帮我接话」点击, 文字长度 =', text.length);
     if (!text) return;
+    if (!requireLogin('生成回话')) return;
     runAnalyze(text, '点击帮我接话');
   };
 
@@ -92,6 +102,7 @@ export default function DefendPage() {
 
   const handleRephrase = async (response: Response) => {
     if (!result || rephrasingId) return;
+    if (!requireLogin('换个说法')) return;
     setRephrasingId(response.id);
     try {
       const newText = await rephraseResponse(result.utterance, response, response.text);
@@ -115,60 +126,63 @@ export default function DefendPage() {
   const engineLabel = activeLLM ? `引擎：${activeLLM.name}` : '引擎：内置规则';
 
   return (
-    <View className={styles.page}>
-      {/* 头部 */}
-      <View className={styles.hero}>
-        <Image className={styles.duck} src={logoDuck} mode='aspectFit' />
-        <View className={styles.heroTexts}>
-          <Text className={styles.heroTitle}>嘴替鸭</Text>
-          <Text className={styles.heroDesc}>社交助手，帮你解决社交尴尬时刻</Text>
-        </View>
-        <View className={styles.engineBadge}>
-          <Text className={styles.engineTag}>{engineLabel}</Text>
-          <Text className={styles.engineLink}>设置页可配置大模型</Text>
-        </View>
-      </View>
-
-      {/* 输入面板 */}
-      <InputPanel value={inputText} onChange={setInputText} onSubmit={handleSubmit} analyzing={analyzing} />
-
-      {/* 分析结果 */}
-      <View className={styles.resultArea}>
-        {analyzing && (
-          <View className={styles.thinking}>
-            <Image className={styles.thinkingDuck} src={logoDuck} mode='aspectFit' />
-            <Text className={styles.thinkingText}>鸭鸭正在拆解对方意图…</Text>
+    <>
+      <View className={styles.page}>
+        {/* 头部 */}
+        <View className={styles.hero}>
+          <Image className={styles.duck} src={logoDuck} mode='aspectFit' />
+          <View className={styles.heroTexts}>
+            <Text className={styles.heroTitle}>嘴替鸭</Text>
+            <Text className={styles.heroDesc}>社交助手，帮你解决社交尴尬时刻</Text>
           </View>
-        )}
+          <View className={styles.engineBadge}>
+            <Text className={styles.engineTag}>{engineLabel}</Text>
+            <Text className={styles.engineLink}>设置页可配置大模型</Text>
+          </View>
+        </View>
 
-        {!analyzing && !result && (
-          <EmptyState
-            title="还没有分析结果"
-            desc={'粘贴、输入或按下麦克风，把接不上话的原话丢给鸭鸭'}
-          />
-        )}
+        {/* 输入面板 */}
+        <InputPanel value={inputText} onChange={setInputText} onSubmit={handleSubmit} analyzing={analyzing} />
 
-        {!analyzing && result && (
-          <>
-            <View className={styles.resultHeader}>
-              <Text className={styles.resultTitle}>为你想了 {result.responses.length} 套回话</Text>
+        {/* 分析结果 */}
+        <View className={styles.resultArea}>
+          {analyzing && (
+            <View className={styles.thinking}>
+              <Image className={styles.thinkingDuck} src={logoDuck} mode='aspectFit' />
+              <Text className={styles.thinkingText}>鸭鸭正在拆解对方意图…</Text>
             </View>
-            <View className={styles.intentCard}>
-              <IntentCard result={result} />
-            </View>
-            {result.responses.map((r) => (
-              <View key={r.id} className={styles.responseItem}>
-                <ResponseCard
-                  response={r}
-                  rephrasing={rephrasingId === r.id}
-                  onCopy={handleCopy}
-                  onRephrase={handleRephrase}
-                />
+          )}
+
+          {!analyzing && !result && (
+            <EmptyState
+              title="还没有分析结果"
+              desc={'粘贴、输入或按下麦克风，把接不上话的原话丢给鸭鸭'}
+            />
+          )}
+
+          {!analyzing && result && (
+            <>
+              <View className={styles.resultHeader}>
+                <Text className={styles.resultTitle}>为你想了 {result.responses.length} 套回话</Text>
               </View>
-            ))}
-          </>
-        )}
+              <View className={styles.intentCard}>
+                <IntentCard result={result} />
+              </View>
+              {result.responses.map((r) => (
+                <View key={r.id} className={styles.responseItem}>
+                  <ResponseCard
+                    response={r}
+                    rephrasing={rephrasingId === r.id}
+                    onCopy={handleCopy}
+                    onRephrase={handleRephrase}
+                  />
+                </View>
+              ))}
+            </>
+          )}
+        </View>
       </View>
-    </View>
+      {loginSheet}
+    </>
   );
 }

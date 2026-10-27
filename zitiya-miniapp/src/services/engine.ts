@@ -7,11 +7,30 @@ import type { IntentRule } from '@/data/intents';
 import { chatCompletion, extractJSON } from '@/services/llm';
 import { useAppStore } from '@/store/useAppStore';
 import { funnelForEngine } from '@/services/quoteFunnel';
-import { getKeywordsFor, getAllIntentRules, getPrompt, getModelParams } from '@/services/sceneConfig';
+import { getKeywordsFor, getAllIntentRules, getPrompt, getModelParams, initCloudConfig } from '@/services/sceneConfig';
 import { filterResponses } from '@/services/contentFilter';
 import { matchInDailyPool, hasDailyPool } from '@/services/dailyIntentPool';
 
 const VALID_STYLES: ResponseStyle[] = ['gentle', 'humor', 'direct', 'counter'];
+
+// 大模型可能编造不在已知意图清单里的标签（如"社会热题"），这里归一化：
+// 命中已知意图名/key 或模糊包含则映射为标准名；无法归类的标签丢弃，避免两端结果不一致
+function normalizeIntentLabels(labels: string[]): string[] {
+  const rules = getAllIntentRules();
+  const knownNames = new Set(rules.map((r) => r.name));
+  const knownKeys = new Set(rules.map((r) => r.key));
+  const out: string[] = [];
+  for (const raw of labels) {
+    const s = String(raw).trim();
+    if (!s) continue;
+    if (knownNames.has(s) || knownKeys.has(s)) { out.push(s); continue; }
+    // 模糊匹配：模型措辞略有差异（如"被领导否定" vs "职场打压"）
+    const hit = rules.find((r) => s.includes(r.name) || r.name.includes(s));
+    if (hit) { out.push(hit.name); continue; }
+    // 未知且无法归类的标签：丢弃，不显示模型临时编造的意图名
+  }
+  return Array.from(new Set(out));
+}
 
 // ============ LLM 交互 ============
 
@@ -55,9 +74,12 @@ async function llmAnalyze(utterance: string): Promise<Omit<AnalysisResult, 'id' 
     }));
   if (responses.length === 0) throw new Error('LLM 未返回有效回话');
 
-  const intentList = (payload.intents && Array.isArray(payload.intents) && payload.intents.length > 0)
+  const rawIntents = (payload.intents && Array.isArray(payload.intents) && payload.intents.length > 0)
     ? payload.intents.slice(0, 5).map((s) => String(s).trim()).filter(Boolean)
     : [String(payload.intent || '未识别').slice(0, 20)];
+  // 归一化：大模型可能编造未知意图名（如"社会热题"），统一映射到已知意图，未知则丢弃
+  const intentList = normalizeIntentLabels(rawIntents);
+  if (intentList.length === 0) intentList.push('未识别场景');
 
   console.log(`[Engine] LLM 分析结果: 意图 ${JSON.stringify(intentList)} 强度 ${payload.intensity}，有效回话 ${responses.length} 条`);
 
@@ -168,6 +190,8 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
   console.log('[API] engine.analyzeUtterance ← 入口, 输入', utterance.trim().length, '字');
   const text = utterance.trim();
   if (!text) throw new Error('输入为空');
+  // 确保云端场景配置（意图集/语录集）已加载，避免冷启动竞态导致不同设备结果不一致
+  await initCloudConfig();
   const startTime = Date.now();
 
   const cfg = useAppStore.getState().getActiveLLM();

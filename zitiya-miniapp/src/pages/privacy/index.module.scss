@@ -1,0 +1,122 @@
+@use '@/styles/variables.scss' as *;
+
+.page {
+  min-height: 100vh;
+  background: $color-bg-page;
+  padding: $spacing-lg $page-padding $spacing-xl;
+}
+
+.hero {
+  text-align: center;
+  padding: $spacing-xl 0 $spacing-lg;
+}
+
+.heroIcon {
+  font-size: 80rpx;
+  display: block;
+  margin-bottom: $spacing-sm;
+}
+
+.heroTitle {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-bold;
+  color: $color-text-primary;
+  display: block;
+  margin-bottom: $spacing-xs;
+}
+
+.heroSub {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+}
+
+.section {
+  background: $color-bg-card;
+  border-radius: $radius-lg;
+  padding: $spacing-lg;
+  margin-bottom: $spacing-md;
+  box-shadow: $shadow-card;
+}
+
+.sectionTitle {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  margin-bottom: $spacing-md;
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+}
+
+.sectionBody {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  line-height: $line-height-loose;
+}
+
+.highlightRow {
+  display: flex;
+  align-items: flex-start;
+  padding: $spacing-sm 0;
+  border-bottom: 1rpx solid $color-divider;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.highlightIcon {
+  font-size: 32rpx;
+  margin-right: 16rpx;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.highlightContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.highlightLabel {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  color: $color-text-primary;
+  display: block;
+  margin-bottom: 4rpx;
+}
+
+.highlightDesc {
+  font-size: $font-size-sm;
+  color: $color-text-tertiary;
+  line-height: 1.6;
+}
+
+.denyList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.denyItem {
+  display: flex;
+  align-items: flex-start;
+  padding: 8rpx 0;
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+}
+
+.denyCheck {
+  color: #52C41A;
+  margin-right: 12rpx;
+  flex-shrink: 0;
+}
+
+.footer {
+  margin-top: $spacing-xl;
+  padding: $spacing-lg;
+  background: #FFF8E1;
+  border-radius: $radius-md;
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+  line-height: $line-height-loose;
+}
