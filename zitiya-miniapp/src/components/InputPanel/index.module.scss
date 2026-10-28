@@ -54,12 +54,18 @@
   border: 2rpx solid $color-border;
   border-radius: $radius-md;
   padding: 24rpx;
-  transition: border-color $transition-base;
+  transition: border-color $transition-base, box-shadow $transition-base;
+
+  &:focus-within {
+    border-color: $color-primary;
+    box-shadow: 0 0 0 4rpx $color-focus-ring;
+  }
 }
 
 .inputBoxRecording {
   border-color: $color-primary;
-  background: #fffdf5;
+  background: #f0f6ff;
+  box-shadow: 0 0 0 4rpx $color-focus-ring;
 }
 
 .textarea {
@@ -111,7 +117,7 @@
   font-size: $font-size-md;
   font-weight: $font-weight-medium;
   color: $color-primary-dark;
-  background: #fff4dd;
+  background: #eef3ff;
   border: 2rpx solid $color-primary-light;
   transition: all $transition-fast;
 

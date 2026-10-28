@@ -1,10 +1,10 @@
 export default defineAppConfig({
-  pages: ['pages/defend/index', 'pages/attack/index', 'pages/quotes/index', 'pages/settings/index', 'pages/profile/index', 'pages/privacy/index', 'pages/admin/index'],
+  pages: ['pages/home/index', 'pages/defend/index', 'pages/attack/index', 'pages/quotes/index', 'pages/profile/index', 'pages/privacy/index', 'pages/admin/index'],
   // 组件按需注入（代码质量扫描要求）
   lazyCodeLoading: 'requiredComponents',
   window: {
     backgroundTextStyle: 'light',
-    navigationBarBackgroundColor: '#FFF9EF',
+    navigationBarBackgroundColor: '#EEF3FC',
     navigationBarTitleText: '嘴替鸭',
     navigationBarTextStyle: 'black'
   },
@@ -24,22 +24,22 @@ export default defineAppConfig({
     }
   },
   tabBar: {
-    color: '#999999',
-    selectedColor: '#D98706',
+    color: '#98A2B3',
+    selectedColor: '#2A4FE0',
     backgroundColor: '#FFFFFF',
     borderStyle: 'black',
     list: [
+      {
+        pagePath: 'pages/home/index',
+        text: '首页',
+        iconPath: 'assets/tabbar/home.png',
+        selectedIconPath: 'assets/tabbar/home-selected.png'
+      },
       {
         pagePath: 'pages/defend/index',
         text: '拆招',
         iconPath: 'assets/tabbar/defend.png',
         selectedIconPath: 'assets/tabbar/defend-selected.png'
-      },
-      {
-        pagePath: 'pages/attack/index',
-        text: '出招',
-        iconPath: 'assets/tabbar/attack.png',
-        selectedIconPath: 'assets/tabbar/attack-selected.png'
       },
       {
         pagePath: 'pages/quotes/index',
@@ -48,10 +48,10 @@ export default defineAppConfig({
         selectedIconPath: 'assets/tabbar/quotes-selected.png'
       },
       {
-        pagePath: 'pages/settings/index',
-        text: '设置',
-        iconPath: 'assets/tabbar/settings.png',
-        selectedIconPath: 'assets/tabbar/settings-selected.png'
+        pagePath: 'pages/attack/index',
+        text: '出招',
+        iconPath: 'assets/tabbar/attack.png',
+        selectedIconPath: 'assets/tabbar/attack-selected.png'
       },
       {
         pagePath: 'pages/profile/index',

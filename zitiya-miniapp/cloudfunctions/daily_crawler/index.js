@@ -11,6 +11,13 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
 
+// 结构化日志：统一输出 JSON 一行，便于云开发控制台检索（ts/level/fn/msg）
+const clog = console.log.bind(console);
+function logf(level, ...args) {
+  const msg = args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
+  clog(JSON.stringify({ ts: Date.now(), level, fn: 'daily_crawler', msg }));
+}
+
 // Node.js 原生 HTTP 请求（替代不存在的 cloud.httpRequest）
 function nodeHttpRequest(opts) {
   return new Promise((resolve, reject) => {
@@ -53,7 +60,7 @@ async function loadSceneConfig() {
     const res = await db.collection('scene_config').where({ _id: 'main' }).get();
     if (res.data.length > 0) return res.data[0];
   } catch (e) {
-    console.warn('[Crawler] scene_config 读取失败:', e.message);
+    logf('warn','[Crawler] scene_config 读取失败:', e.message);
   }
   return {};
 }
@@ -62,27 +69,27 @@ async function loadTopics(cfg) {
   // 兼容驼峰（crawlTopics）与蛇形（crawl_topics，与前端 scene_config 文档一致）
   const custom = (cfg.crawlTopics?.length ? cfg.crawlTopics : cfg.crawl_topics) || [];
   if (custom.length > 0) {
-    console.log('[Crawler] 使用自定义话题:', custom);
+    logf('info','[Crawler] 使用自定义话题:', custom);
     return custom;
   }
-  console.log('[Crawler] 使用默认话题:', DEFAULT_TOPICS);
+  logf('info','[Crawler] 使用默认话题:', DEFAULT_TOPICS);
   return DEFAULT_TOPICS;
 }
 
 async function loadDailyLimit(cfg) {
   const n = Number(cfg.dailyQuoteLimit || cfg.daily_quote_limit);
   if (n > 0) {
-    console.log('[Crawler] 每日入库条数:', n);
+    logf('info','[Crawler] 每日入库条数:', n);
     return n;
   }
-  console.log('[Crawler] 使用默认每日条数:', DEFAULT_DAILY_LIMIT);
+  logf('info','[Crawler] 使用默认每日条数:', DEFAULT_DAILY_LIMIT);
   return DEFAULT_DAILY_LIMIT;
 }
 
 async function loadTTLDays(cfg) {
   const d = Number(cfg.dailyQuoteTTLDays || cfg.daily_quote_ttl_days);
   if (d > 0) {
-    console.log('[Crawler] 使用自定义 TTL 天数:', d);
+    logf('info','[Crawler] 使用自定义 TTL 天数:', d);
     return d;
   }
   return DEFAULT_TTL_DAYS;
@@ -171,7 +178,7 @@ async function crawlWeiboTopic(topic) {
     });
 
     if (!res.body) {
-      console.warn(`[Crawler] 话题「${topic}」返回空 body`);
+      logf('warn',`[Crawler] 话题「${topic}」返回空 body`);
       return [];
     }
 
@@ -227,10 +234,10 @@ async function crawlWeiboTopic(topic) {
       }
     }
 
-    console.log(`[Crawler] 话题「${topic}」提取 ${items.length} 条 (总点赞 ${items.reduce((s, i) => s + i.like_count, 0)})`);
+    logf('info',`[Crawler] 话题「${topic}」提取 ${items.length} 条 (总点赞 ${items.reduce((s, i) => s + i.like_count, 0)})`);
     return items;
   } catch (e) {
-    console.warn(`[Crawler] 话题「${topic}」爬取失败:`, e.message);
+    logf('warn',`[Crawler] 话题「${topic}」爬取失败:`, e.message);
     return [];
   }
 }
@@ -269,7 +276,7 @@ async function dedupeContents(contents) {
     const existingSet = new Set(existing.data.map((d) => d.content));
     return contents.filter((c) => !existingSet.has(c));
   } catch (e) {
-    console.warn('[Crawler] 去重查询失败:', e.message);
+    logf('warn','[Crawler] 去重查询失败:', e.message);
     return contents;
   }
 }
@@ -281,9 +288,9 @@ async function cleanupExpired(cfg) {
     const res = await db.collection('daily_quotes')
       .where({ fetched_at: _.lt(cutoff) })
       .remove();
-    console.log('[Crawler] 清理过期条目:', res.stats?.removed || 0);
+    logf('info','[Crawler] 清理过期条目:', res.stats?.removed || 0);
   } catch (e) {
-    console.warn('[Crawler] 清理过期失败:', e.message);
+    logf('warn','[Crawler] 清理过期失败:', e.message);
   }
 }
 
@@ -298,7 +305,7 @@ exports.main = async (event, context) => {
   const kwMap = loadKeywordMap(cfg);
   const dailyLimit = event.limit || await loadDailyLimit(cfg);
 
-  console.log(`[Crawler] 开始: ${topics.length} 个话题, 每日上限 ${dailyLimit}, keywords=${Object.keys(kwMap).length} 个意图`);
+  logf('info',`[Crawler] 开始: ${topics.length} 个话题, 每日上限 ${dailyLimit}, keywords=${Object.keys(kwMap).length} 个意图`);
 
   // 1. 爬取
   const allRaw = [];
@@ -306,7 +313,7 @@ exports.main = async (event, context) => {
     const items = await crawlWeiboTopic(topic);
     allRaw.push(...items);
   }
-  console.log(`[Crawler] 原始爬取: ${allRaw.length} 条`);
+  logf('info',`[Crawler] 原始爬取: ${allRaw.length} 条`);
 
   // 2. 关键词过滤 + 打分
   const annotated = allRaw
@@ -316,7 +323,7 @@ exports.main = async (event, context) => {
     })
     .filter((item) => item.useful);
 
-  console.log(`[Crawler] 关键词过滤后: ${annotated.length} 条`);
+  logf('info',`[Crawler] 关键词过滤后: ${annotated.length} 条`);
 
   if (annotated.length === 0) {
     return { code: 0, message: 'ok (无新数据)', data: { inserted: 0, elapsedMs: Date.now() - startTime } };
@@ -325,7 +332,7 @@ exports.main = async (event, context) => {
   // 3. 综合排序（点赞 × 0.6 + 关键词匹配度 × 0.4）→ 取 Top N
   const sorted = scoreAndSort(annotated);
   const topN = sorted.slice(0, dailyLimit);
-  console.log(`[Crawler] 排序取 Top ${topN.length} / ${sorted.length}`);
+  logf('info',`[Crawler] 排序取 Top ${topN.length} / ${sorted.length}`);
 
   // 4. 去重
   const newContents = await dedupeContents(topN.map((a) => a.content));
@@ -349,7 +356,7 @@ exports.main = async (event, context) => {
       });
       inserted++;
     } catch (e) {
-      console.warn('[Crawler] 入库失败:', e.message);
+      logf('warn','[Crawler] 入库失败:', e.message);
     }
   }
 

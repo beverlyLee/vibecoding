@@ -71,7 +71,7 @@ export default function InputPanel({ value, onChange, onSubmit, analyzing }: Inp
           console.error('[InputPanel] 语音错误:', message);
           endRecording();
           if (message.length > 30) {
-            Taro.showModal({ title: '语音转写失败', content: message, showCancel: false, confirmText: '知道了', confirmColor: '#E8940A' });
+            Taro.showModal({ title: '语音转写失败', content: message, showCancel: false, confirmText: '知道了', confirmColor: '#3B6CFF' });
           } else {
             Taro.showToast({ title: message, icon: 'none', duration: 3000 });
           }

@@ -36,6 +36,7 @@ exports.main = async (event, context) => {
       fetched_at: d.fetched_at
     }));
 
+    console.log(JSON.stringify({ ts: Date.now(), level: 'info', fn: 'get_daily_quotes', msg: '返回 ' + quotes.length + ' 条' }));
     return {
       code: 0,
       message: 'ok',

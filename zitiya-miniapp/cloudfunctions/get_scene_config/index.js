@@ -23,7 +23,7 @@ exports.main = async (event, context) => {
         data: null
       };
     }
-    console.error('[get_scene_config] 错误:', err);
+    console.log(JSON.stringify({ ts: Date.now(), level: 'error', fn: 'get_scene_config', msg: '[get_scene_config] 错误: ' + (err && err.message ? err.message : String(err)) }));
     return {
       code: 1,
       message: err?.message || String(err),

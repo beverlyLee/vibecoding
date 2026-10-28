@@ -32,11 +32,11 @@
 }
 
 .intentTag {
-  font-size: 32rpx;
+  font-size: 28rpx;
   font-weight: $font-weight-semibold;
-  color: $color-text-primary;
-  background: $color-primary-light;
-  padding: 4rpx 20rpx;
+  color: $color-primary-dark;
+  background: rgba(59, 108, 255, 0.1);
+  padding: 6rpx 22rpx;
   border-radius: $radius-round;
 }
 
@@ -83,7 +83,7 @@
 .sourceText {
   font-size: $font-size-xs;
   color: $color-primary-dark;
-  background: #fff4dd;
+  background: #eef3ff;
   padding: 4rpx 16rpx;
   border-radius: $radius-xs;
 }

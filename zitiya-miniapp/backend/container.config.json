@@ -1,0 +1,25 @@
+{
+  "containerPort": 8000,
+  "minNum": 0,
+  "maxNum": 1,
+  "cpu": 1,
+  "mem": 1,
+  "policyType": 1,
+  "policyThreshold": 60,
+  "customLogs": "stdout",
+  "healthCheck": {
+    "type": "HTTP",
+    "path": "/",
+    "intervalSeconds": 10,
+    "timeoutSeconds": 3,
+    "numRetries": 3
+  },
+  "startupProbe": {
+    "type": "HTTP",
+    "path": "/",
+    "initialDelaySeconds": 3,
+    "timeoutSeconds": 3,
+    "periodSeconds": 5,
+    "numRetries": 3
+  }
+}

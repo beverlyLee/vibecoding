@@ -42,6 +42,6 @@ jobs:
         run: |
           npm i -g @cloudbase/cli
           tcb login --apiKeyId "${{ secrets.TCB_API_KEY_ID }}" --apiKey "${{ secrets.TCB_API_KEY }}"
-          for fn in user admin_users daily_crawler get_daily_quotes get_scene_config seed_daily_quotes; do
+          for fn in user admin_config admin_users user_quotes daily_crawler get_daily_quotes get_scene_config seed_daily_quotes; do
             tcb fn deploy "$fn" -e "$TCB_ENV_ID" --dir "cloudfunctions/$fn" --install-dependency true --yes
           done

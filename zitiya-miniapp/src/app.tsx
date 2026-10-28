@@ -1,8 +1,10 @@
 import React, { useEffect } from 'react';
 import Taro, { useDidShow, useDidHide } from '@tarojs/taro';
 import { useAppStore } from '@/store/useAppStore';
-import { useUserStore } from '@/store/useUserStore';
+import { authStore } from '@/store/useUserStore';
 import { initCloudConfig } from '@/services/sceneConfig';
+import { logger } from '@/utils/logger';
+import { initMonitor } from '@/utils/monitor';
 // 全局样式
 import './app.scss';
 
@@ -16,8 +18,10 @@ function App(props) {
     if (process.env.TARO_ENV === 'weapp') {
       Taro.cloud.init({ env: CLOUD_ENV, traceUser: true });
     }
+    // 云环境初始化后再启动全局监控（保证 track 上报通道可用）
+    initMonitor();
     initCloudConfig().then(() => {
-      console.log('[App] 配置加载完成');
+      logger.info('[App] 配置加载完成');
     });
   }, []);
 
@@ -25,8 +29,8 @@ function App(props) {
   useEffect(() => {
     useAppStore.getState().init();
     if (process.env.TARO_ENV === 'weapp') {
-      useUserStore.getState().init().catch((e) => {
-        console.warn('[App] 用户会话恢复失败（保持游客）:', e?.message || e);
+      authStore.init().catch((e) => {
+        logger.warn('[App] 用户会话恢复失败（保持游客）:', e?.message || e);
       });
     }
   }, []);

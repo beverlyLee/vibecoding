@@ -12,7 +12,7 @@ interface LoginSheetProps {
 
 // 极简登录弹层：只有隐私勾选 + 微信一键登录按钮
 export default function LoginSheet({ visible, onClose }: LoginSheetProps) {
-  const login = useUserStore((s) => s.login);
+  const { login } = useUserStore();
 
   const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -39,11 +39,18 @@ export default function LoginSheet({ visible, onClose }: LoginSheetProps) {
     if (loading) return;
     setLoading(true);
     try {
-      await login();
-      handleClose();
-      Taro.showToast({ title: '登录成功', icon: 'success' });
+      const user = await login();
+      if (user) {
+        handleClose();
+        Taro.showToast({ title: '登录成功', icon: 'success' });
+      } else {
+        // store.login 失败时返回 null（auth.login 内部已 setState 回 guest）
+        Taro.showToast({ title: '登录失败，请再试一次', icon: 'none' });
+      }
     } catch (e: any) {
-      if (e?.code !== 403) {
+      if (e?.code === 403) {
+        // 封禁弹窗已经由 auth.login 自己弹了，这里静默
+      } else {
         Taro.showToast({ title: e?.message || '登录失败', icon: 'none' });
       }
     } finally {

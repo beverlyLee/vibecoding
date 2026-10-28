@@ -1,7 +1,7 @@
 // 语录库三层漏斗：固定规则库（Layer 1）+ 每日拉取库 + LLM 实时生成
 
 // Quote 来源层级
-export type QuoteSource = 'fixed' | 'daily' | 'ai';
+export type QuoteSource = 'fixed' | 'daily' | 'ai' | 'user';
 
 export interface Quote {
   id: string;

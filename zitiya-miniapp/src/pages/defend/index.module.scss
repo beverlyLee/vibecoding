@@ -2,67 +2,135 @@
 
 .page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #fff3d6 0%, $color-bg-page 400rpx);
+  background: linear-gradient(180deg, #eef3fc 0%, $color-bg-page 320rpx);
   padding: 24rpx $page-padding 48rpx;
 }
 
-// 头部
-.hero {
+// ===== 欢迎区 =====
+.welcome {
+  margin-bottom: $spacing-lg;
+}
+
+.welcomeHead {
   display: flex;
   align-items: center;
-  margin-bottom: $spacing-lg;
-  padding: 0 8rpx;
+  padding: 0 8rpx 24rpx;
 }
 
 .duck {
-  width: 80rpx;
-  height: 80rpx;
+  width: 96rpx;
+  height: 96rpx;
   margin-right: $spacing-md;
-  border-radius: 20rpx;
-  filter: drop-shadow(0 4rpx 8rpx rgba(232, 148, 10, 0.3));
+  border-radius: 28rpx;
+  background: #ffffff;
+  box-shadow: 0 6rpx 18rpx rgba(31, 56, 112, 0.1);
+  padding: 10rpx;
+  box-sizing: border-box;
 }
 
-.heroTexts {
+.welcomeTexts {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-width: 0;
 }
 
-.heroTitle {
+.greet {
   font-size: $font-size-xxl;
   font-weight: $font-weight-bold;
   color: $color-text-primary;
+  line-height: 1.3;
 }
 
-.heroDesc {
+.welcomeSub {
   font-size: $font-size-sm;
-  color: $color-text-tertiary;
-  margin-top: 4rpx;
+  color: $color-text-secondary;
+  margin-top: 6rpx;
 }
 
-.engineBadge {
-  margin-left: auto;
+.welcomeCard {
+  background: linear-gradient(135deg, #f4f8ff 0%, #eaf1ff 100%);
+  border: 1rpx solid $color-border;
+  border-radius: $radius-xl;
+  padding: 32rpx;
+  box-shadow: $shadow-card;
+}
+
+.welcomeDesc {
+  display: block;
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  line-height: $line-height-loose;
+  margin-bottom: 28rpx;
+}
+
+// 三步上手
+.steps {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.step {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
 }
 
-.engineTag {
-  font-size: 20rpx;
-  color: $color-primary-dark;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1rpx solid $color-primary-light;
+.stepNum {
+  width: 56rpx;
+  height: 56rpx;
   border-radius: $radius-round;
-  padding: 6rpx 20rpx;
+  background: $color-gradient-primary;
+  @include flex-center;
+  margin-bottom: 12rpx;
+  box-shadow: 0 4rpx 12rpx rgba(59, 108, 255, 0.25);
+}
+
+.stepNumText {
+  font-size: $font-size-md;
+  font-weight: $font-weight-bold;
+  color: $color-on-primary;
+}
+
+.stepLabel {
+  font-size: $font-size-xs;
+  color: $color-text-secondary;
   white-space: nowrap;
 }
 
-.engineLink {
-  font-size: 20rpx;
-  color: $color-text-tertiary;
-  margin-top: 8rpx;
+.stepArrow {
+  align-self: center;
+  margin-top: 18rpx;
+  font-size: $font-size-md;
+  color: $color-primary-light;
+  padding: 0 4rpx;
 }
 
-// 结果区
+// 引擎提示 pill
+.enginePill {
+  margin-top: 28rpx;
+  display: flex;
+  justify-content: center;
+
+  &:active {
+    opacity: 0.7;
+  }
+}
+
+.enginePillText {
+  font-size: $font-size-xs;
+  color: $color-primary-dark;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1rpx solid $color-primary-light;
+  border-radius: $radius-round;
+  padding: 8rpx 24rpx;
+  white-space: nowrap;
+}
+
+// ===== 结果区 =====
 .resultArea {
   margin-top: $spacing-lg;
 }
@@ -117,11 +185,12 @@
   color: $color-text-primary;
 }
 
-.fallbackTip {
+// 友好页脚
+.footerTip {
+  display: block;
+  text-align: center;
   font-size: $font-size-xs;
-  color: $color-warning;
-}
-
-.sectionGap {
-  height: 24rpx;
+  color: $color-text-tertiary;
+  margin-top: $spacing-xl;
+  line-height: $line-height-loose;
 }

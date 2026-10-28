@@ -31,7 +31,7 @@
   align-self: flex-start;
   font-size: 20rpx;
   color: $color-primary-dark;
-  background: #fff4dd;
+  background: #eef3ff;
   padding: 4rpx 16rpx;
   border-radius: $radius-xs;
   margin-bottom: 12rpx;
@@ -133,8 +133,8 @@
 .roleTagMe {
   flex-shrink: 0;
   font-size: 20rpx;
-  color: $color-on-primary;
-  background: $color-primary-light;
+  color: $color-primary-dark;
+  background: rgba(59, 108, 255, 0.12);
   border-radius: $radius-xs;
   padding: 4rpx 12rpx;
   margin-right: $spacing-sm;

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, Image } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import InputPanel from '@/components/InputPanel';
@@ -12,6 +12,8 @@ import { useLoginSheet } from '@/hooks/useLoginSheet';
 import type { AnalysisResult, Response } from '@/types/analysis';
 import logoDuck from '@/assets/logo.png';
 import styles from './index.module.scss';
+import { logger, track } from '@/utils/logger';
+import { EVENTS } from '@/utils/monitor';
 
 // 按 result.source 给出页面提示
 function showSourceToast(source: string) {
@@ -29,11 +31,11 @@ function showSourceToast(source: string) {
       Taro.showModal({
         title: '默认规则库没匹配到',
         content: '可以在设置里配置你的大模型，开启后能识别更多场景并生成更贴切的回话。',
-        confirmText: '去设置',
+        confirmText: '去我的',
         cancelText: '算了',
         success: (res) => {
           if (res.confirm) {
-            Taro.switchTab({ url: '/pages/settings/index' });
+            Taro.switchTab({ url: '/pages/profile/index' });
           }
         },
       });
@@ -41,7 +43,7 @@ function showSourceToast(source: string) {
   }
 }
 
-// 拆招页：输入原话 → 自动分析 → 多套回话
+// 拆招页（首页）：欢迎 + 输入原话 → 自动分析 → 多套回话
 export default function DefendPage() {
   const [inputText, setInputText] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
@@ -49,14 +51,19 @@ export default function DefendPage() {
   const [rephrasingId, setRephrasingId] = useState<string | null>(null);
   const activeLLM = useAppStore((s) => s.getActiveLLM());
   const clearPendingQuote = useAppStore((s) => s.clearPendingQuote);
-  const requireLogin = useUserStore((s) => s.requireLogin);
+  const { requireLogin } = useUserStore();
   const loginSheet = useLoginSheet();
+
+  // 页面曝光埋点
+  useEffect(() => {
+    track(EVENTS.PAGE_VIEW, { page: 'defend' });
+  }, []);
 
   // 页面显示时检查语录回填
   useDidShow(() => {
     const quote = useAppStore.getState().pendingQuote;
     if (quote) {
-      console.log('[API] DefendPage.useDidShow ← 检测到语录回填:', quote.slice(0, 40));
+      logger.debug('[Defend] 检测到语录回填, 长度', quote.length);
       // 语录回填触发的分析也需要登录，保持体验一致
       if (!requireLogin('生成回话')) {
         clearPendingQuote(); // 未登录就清掉，避免下次还触发
@@ -68,19 +75,27 @@ export default function DefendPage() {
     }
   });
 
-  // 只在点击"帮我接话"按钮时触发分析，打字期间不自动执行
-
   const runAnalyze = async (text: string, source: string = '手动点击') => {
     if (!text.trim()) return;
     setAnalyzing(true);
+    track(EVENTS.ANALYZE_START, {
+      from: source,
+      engineType: useAppStore.getState().getActiveLLM() ? 'llm' : 'rule',
+    });
     try {
-      console.log(`[API] DefendPage.runAnalyze(${source}) ← 开始, ${text.length}字:`, text.slice(0, 40));
       const res = await analyzeUtterance(text);
       setResult(res);
-      console.log(`[API] DefendPage.runAnalyze(${source}) ✔ 完成, 意图「${res.intent}」, 来源 ${res.source}, 耗时 ${res.costMs}ms`);
+      track(EVENTS.ANALYZE_DONE, {
+        from: source,
+        source: res.source,
+        intentKey: res.intent?.[0] || '',
+        costMs: res.costMs,
+        ok: true,
+      });
       showSourceToast(res.source);
     } catch (err) {
-      console.error(`[API] DefendPage.runAnalyze(${source}) ✘ 失败:`, err);
+      logger.error('[Defend] 分析失败:', err?.message || err);
+      track(EVENTS.ANALYZE_ERROR, { from: source, ok: false });
       Taro.showToast({ title: '分析出错了，再试一次', icon: 'none' });
     } finally {
       setAnalyzing(false);
@@ -97,6 +112,7 @@ export default function DefendPage() {
 
   const handleCopy = async (text: string) => {
     const ok = await copyText(text);
+    track(EVENTS.COPY_RESPONSE, { ok });
     if (ok) Taro.showToast({ title: '已复制，拿去用吧', icon: 'success', duration: 1200 });
   };
 
@@ -116,73 +132,111 @@ export default function DefendPage() {
         };
       });
     } catch (err) {
-      console.error('[Defend] 换说法失败:', err);
+      logger.error('[Defend] 换说法失败:', err instanceof Error ? err.message : err);
       Taro.showToast({ title: '换个说法失败了', icon: 'none' });
     } finally {
       setRephrasingId(null);
     }
   };
 
-  const engineLabel = activeLLM ? `引擎：${activeLLM.name}` : '引擎：内置规则';
+  const engineLabel = activeLLM ? `当前引擎：${activeLLM.name}` : '当前引擎：内置规则';
 
   return (
-    <>
-      <View className={styles.page}>
-        {/* 头部 */}
-        <View className={styles.hero}>
+    <View className={styles.page}>
+      {/* 欢迎区 */}
+      <View className={styles.welcome}>
+        <View className={styles.welcomeHead}>
           <Image className={styles.duck} src={logoDuck} mode='aspectFit' />
-          <View className={styles.heroTexts}>
-            <Text className={styles.heroTitle}>嘴替鸭</Text>
-            <Text className={styles.heroDesc}>社交助手，帮你解决社交尴尬时刻</Text>
-          </View>
-          <View className={styles.engineBadge}>
-            <Text className={styles.engineTag}>{engineLabel}</Text>
-            <Text className={styles.engineLink}>设置页可配置大模型</Text>
+          <View className={styles.welcomeTexts}>
+            <Text className={styles.greet}>帮你拆招</Text>
+            <Text className={styles.welcomeSub}>接不上话的时刻，把原话交给我</Text>
           </View>
         </View>
 
-        {/* 输入面板 */}
-        <InputPanel value={inputText} onChange={setInputText} onSubmit={handleSubmit} analyzing={analyzing} />
-
-        {/* 分析结果 */}
-        <View className={styles.resultArea}>
-          {analyzing && (
-            <View className={styles.thinking}>
-              <Image className={styles.thinkingDuck} src={logoDuck} mode='aspectFit' />
-              <Text className={styles.thinkingText}>鸭鸭正在拆解对方意图…</Text>
+        <View className={styles.welcomeCard}>
+          <Text className={styles.welcomeDesc}>
+            把让你语塞的话发给我，鸭鸭帮你拆解对方的意图，想好几套回话，复制就能用。
+          </Text>
+          <View className={styles.steps}>
+            <View className={styles.step}>
+              <View className={styles.stepNum}>
+                <Text className={styles.stepNumText}>1</Text>
+              </View>
+              <Text className={styles.stepLabel}>粘贴原话</Text>
             </View>
-          )}
-
-          {!analyzing && !result && (
-            <EmptyState
-              title="还没有分析结果"
-              desc={'粘贴、输入或按下麦克风，把接不上话的原话丢给鸭鸭'}
-            />
-          )}
-
-          {!analyzing && result && (
-            <>
-              <View className={styles.resultHeader}>
-                <Text className={styles.resultTitle}>为你想了 {result.responses.length} 套回话</Text>
+            <Text className={styles.stepArrow}>→</Text>
+            <View className={styles.step}>
+              <View className={styles.stepNum}>
+                <Text className={styles.stepNumText}>2</Text>
               </View>
-              <View className={styles.intentCard}>
-                <IntentCard result={result} />
+              <Text className={styles.stepLabel}>识别意图</Text>
+            </View>
+            <Text className={styles.stepArrow}>→</Text>
+            <View className={styles.step}>
+              <View className={styles.stepNum}>
+                <Text className={styles.stepNumText}>3</Text>
               </View>
-              {result.responses.map((r) => (
-                <View key={r.id} className={styles.responseItem}>
-                  <ResponseCard
-                    response={r}
-                    rephrasing={rephrasingId === r.id}
-                    onCopy={handleCopy}
-                    onRephrase={handleRephrase}
-                  />
-                </View>
-              ))}
-            </>
-          )}
+              <Text className={styles.stepLabel}>复制回话</Text>
+            </View>
+          </View>
+          <View
+            className={styles.enginePill}
+            onClick={() => Taro.switchTab({ url: '/pages/profile/index' })}
+          >
+            <Text className={styles.enginePillText}>
+              {engineLabel} · 去「我的」可升级 AI 引擎 ›
+            </Text>
+          </View>
         </View>
       </View>
+
+      {/* 输入面板 */}
+      <InputPanel value={inputText} onChange={setInputText} onSubmit={handleSubmit} analyzing={analyzing} />
+
+      {/* 分析结果 */}
+      <View className={styles.resultArea}>
+        {analyzing && (
+          <View className={styles.thinking}>
+            <Image className={styles.thinkingDuck} src={logoDuck} mode='aspectFit' />
+            <Text className={styles.thinkingText}>鸭鸭正在拆解对方意图…</Text>
+          </View>
+        )}
+
+        {!analyzing && !result && (
+          <EmptyState
+            title="还没有分析结果"
+            desc={'粘贴、输入或按下麦克风，把接不上话的原话丢给鸭鸭'}
+          />
+        )}
+
+        {!analyzing && result && (
+          <>
+            <View className={styles.resultHeader}>
+              <Text className={styles.resultTitle}>为你想了 {result.responses.length} 套回话</Text>
+            </View>
+            <View className={styles.intentCard}>
+              <IntentCard result={result} />
+            </View>
+            {result.responses.map((r) => (
+              <View key={r.id} className={styles.responseItem}>
+                <ResponseCard
+                  response={r}
+                  rephrasing={rephrasingId === r.id}
+                  onCopy={handleCopy}
+                  onRephrase={handleRephrase}
+                />
+              </View>
+            ))}
+          </>
+        )}
+      </View>
+
+      {/* 友好页脚 */}
+      <Text className={styles.footerTip}>
+        鸭鸭只是帮你组织语言，开口前记得结合当下语境哦
+      </Text>
+
       {loginSheet}
-    </>
+    </View>
   );
 }

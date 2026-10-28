@@ -1,0 +1,10 @@
+{
+  "name": "report_event",
+  "version": "1.0.0",
+  "private": true,
+  "description": "接收前端埋点/远程日志并写入 app_logs 集合（隐私白名单过滤）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

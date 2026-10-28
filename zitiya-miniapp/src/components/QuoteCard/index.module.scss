@@ -17,7 +17,7 @@
 .category {
   font-size: 20rpx;
   color: $color-primary-dark;
-  background: #fff4dd;
+  background: #eef3ff;
   padding: 4rpx 16rpx;
   border-radius: $radius-xs;
 }
@@ -40,13 +40,54 @@
   background: #ede9fe;
 }
 
+.source_user {
+  color: #d97706;
+  background: #fef3c7;
+}
+
+.actionGroup {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.editBtn {
+  font-size: $font-size-xs;
+  color: $color-text-secondary;
+  padding: 8rpx 16rpx;
+  border-radius: $radius-xs;
+  background: rgba($color-primary, 0.08);
+}
+
+.deleteBtn {
+  font-size: $font-size-sm;
+  color: #ff4d4f;
+  padding: 8rpx 12rpx;
+}
+
 .content {
   display: block;
   font-size: $font-size-lg;
   font-weight: $font-weight-medium;
   color: $color-text-primary;
   line-height: $line-height-loose;
-  margin-bottom: 20rpx;
+  margin-bottom: 16rpx;
+}
+
+.keywordRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-bottom: 16rpx;
+}
+
+.keywordChip {
+  font-size: $font-size-xs;
+  color: $color-primary-dark;
+  background: rgba($color-primary, 0.08);
+  padding: 4rpx 16rpx;
+  border-radius: $radius-round;
 }
 
 .bottomRow {

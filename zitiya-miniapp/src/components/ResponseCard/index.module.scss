@@ -1,10 +1,22 @@
 @use '@/styles/variables.scss' as *;
 
 .card {
+  position: relative;
   background: $color-bg-card;
+  border: 1rpx solid $color-divider;
   border-radius: $radius-lg;
   box-shadow: $shadow-card;
   overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6rpx;
+    background: $color-gradient-primary;
+  }
 }
 
 .styleBar {
@@ -35,8 +47,10 @@
   color: $color-text-primary;
   line-height: $line-height-loose;
   margin: 8rpx 32rpx 0;
-  padding-left: 24rpx;
-  border-left: 6rpx solid;
+  padding: 24rpx 28rpx;
+  background: #f5f8ff;
+  border-radius: 4rpx $radius-lg $radius-lg $radius-lg;
+  border-left: 6rpx solid $color-primary;
 }
 
 .reasonWrap {

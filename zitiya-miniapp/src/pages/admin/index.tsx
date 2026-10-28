@@ -36,15 +36,15 @@ const TABS: Array<{ key: TabKey; label: string }> = [
 ];
 
 export default function AdminPage() {
-  const user = useUserStore((s) => s.user);
+  const { user, role } = useUserStore();
   const isAdmin = user?.role === 'admin';
   const isStaff = isAdmin || user?.role === 'operator';
 
   const [tab, setTab] = useState<TabKey>('users');
 
   useDidShow(() => {
-    const role = useUserStore.getState().user?.role;
-    if (role === 'user' || !role) {
+    const r = role();
+    if (r === 'user' || !r) {
       Taro.showToast({ title: '无权限访问', icon: 'none' });
       setTimeout(() => Taro.reLaunch({ url: '/pages/defend/index' }), 1000);
     }
