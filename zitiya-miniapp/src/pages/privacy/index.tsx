@@ -64,7 +64,7 @@ export default function PrivacyPage() {
           </View>
           <View className={styles.denyItem}>
             <Text className={styles.denyCheck}>✕</Text>
-            <Text>相册、相机、麦克风（拆招页的"语音输入"功能暂未上线，未来上线前会单独向你申请授权）</Text>
+            <Text>相册、相机（除非你主动使用语音输入，否则我们不会申请麦克风权限；语音仅在本次实时转写为文字，不保存音频、不上传音频）</Text>
           </View>
           <View className={styles.denyItem}>
             <Text className={styles.denyCheck}>✕</Text>
@@ -77,13 +77,31 @@ export default function PrivacyPage() {
       <View className={styles.section}>
         <Text className={styles.sectionTitle}>🔑 API Key 与模型配置</Text>
         <Text className={styles.sectionBody}>
-          你在「设置」页配置的大模型 API Key、接口地址、模型名称等，均保存在你自己的手机上，
-          通过微信小程序本地存储（Taro.setStorageSync）实现。嘴替鸭服务器**不会接收、存储或转发**你的 API Key。
+          你在「我的 → 模型配置」里配置的大模型 API Key、接口地址、模型名称等，均保存在你自己的手机上，
+          通过微信小程序本地存储（Taro.setStorageSync）实现。嘴替鸭服务器<Text className={styles.strong}>不会接收、存储或转发</Text>你的 API Key。
         </Text>
         <View style={{ height: '16rpx' }} />
         <Text className={styles.sectionBody}>
           当你在拆招/出招时，模型请求由你的手机直接发往厂商接口（如 DeepSeek、火山引擎、硅基流动等）。
-          请求中只包含你输入的原话和模型参数，**不携带 openid、昵称等任何身份信息**。
+          请求中只包含你输入的原话和模型参数，<Text className={styles.strong}>不携带 openid、昵称等任何身份信息</Text>。
+        </Text>
+      </View>
+
+      {/* 日志与匿名数据 */}
+      <View className={styles.section}>
+        <Text className={styles.sectionTitle}>📊 日志与匿名数据</Text>
+        <Text className={styles.sectionBody}>
+          为了改进产品，我们会收集少量匿名使用数据，例如：你访问了哪些页面、使用了哪些功能（如拆招分析、语录浏览、是否启用 AI 引擎）、设备类型等。
+        </Text>
+        <View style={{ height: '16rpx' }} />
+        <Text className={styles.sectionBody}>
+          这些数据的收集遵循一条不可逾越的底线——<Text className={styles.strong}>绝不包含你输入的任何原话、生成的回话内容，也不包含你的 API Key</Text>。
+          即使发生报错，日志里也只会记录错误类型与耗时，不会记录造成错误的那句话。
+        </Text>
+        <View style={{ height: '16rpx' }} />
+        <Text className={styles.sectionBody}>
+          小程序端的行为数据通过微信云开发匿名上报，仅用于统计聚合（例如「今天有多少人用了拆招」），无法回溯到具体个人；
+          网页版（H5）的运行日志只保存在你自己的浏览器本地，不会上传到任何服务器。
         </Text>
       </View>
 

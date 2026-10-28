@@ -1,43 +1,60 @@
 // ============================================
-// 主题配色变量（嘴替鸭 · 暖黄治愈系）
+// 主题配色变量（嘴替鸭 · 科技蓝青 · 简约交流风）
 // ============================================
 
-// 品牌主题色：鸭黄
-$color-primary: #ffb020;
-$color-primary-light: #ffd05a;
-$color-primary-dark: #e8940a;
+// 品牌主色：科技蓝 → 信号青（communication 隐喻，寓意"对话/信号"）
+$color-primary: #3b6cff;
+$color-primary-light: #7c9bff;
+$color-primary-dark: #2a4fe0;
 
-// 主按钮上的文字色（深棕，保证在鸭黄上可读）
-$color-on-primary: #4a3200;
-// 主按钮渐变
-$color-gradient-primary: linear-gradient(135deg, #ffd05a 0%, #ffb020 100%);
+// 主按钮上的文字色（蓝底改白字，更清晰、更科技）
+$color-on-primary: #ffffff;
+// 主按钮渐变（蓝 → 青）
+$color-gradient-primary: linear-gradient(135deg, #4f8bff 0%, #21c7e0 100%);
 // 选中态文字色（tabBar 等，用加深的主色保证对比）
-$color-primary-deep: #d98706;
+$color-primary-deep: #2a4fe0;
 
-// 功能色
-$color-success: #00b42a;
-$color-warning: #ff7d00;
-$color-error: #f53f3f;
-$color-info: #165dff;
+// 顶部导航栏底色（与页面顶部渐变起点一致，实现"导航栏-页面"无缝衔接）
+$color-nav-bg: #eef3fc;
+// 底部 tabBar 选中色（与图标保持一致）
+$color-tab-selected: #2a4fe0;
 
-// 回应风格色
-$color-style-gentle: #00b42a; // 温和化解
-$color-style-humor: #ff7d00; // 幽默带过
-$color-style-direct: #f53f3f; // 直接拒绝
-$color-style-counter: #722ed1; // 反将一军
+// 功能色（偏冷、现代）
+$color-success: #10b981;
+$color-warning: #f59e0b;
+$color-error: #ef466f;
+$color-info: #3b6cff;
 
-// 背景色
-$color-bg-page: #fff9ef;
+// 回应风格色（低饱和、区分度高的现代色板）
+$color-style-gentle: #10b981; // 温和化解 - 青绿
+$color-style-humor: #f59e0b; // 幽默带过 - 琥珀
+$color-style-direct: #ef466f; // 直接拒绝 - 玫红
+$color-style-counter: #8b5cf6; // 反将一军 - 紫
+
+// 背景色（清爽冷灰，去掉奶油黄）
+$color-bg-page: #f4f7fb;
 $color-bg-card: #ffffff;
-$color-bg-hover: #fff4dd;
+$color-bg-hover: #eef3ff; // 蓝调浅底
 
 // 文本色
-$color-text-primary: #1d2129;
-$color-text-secondary: #4e5969;
-$color-text-tertiary: #86909c;
-$color-text-disabled: #c9cdd4;
+$color-text-primary: #16213a;
+$color-text-secondary: #5a6678;
+$color-text-tertiary: #98a2b3;
+$color-text-disabled: #c9d2e0;
 $color-text-white: #ffffff;
 
 // 边框色
-$color-border: #e5e6eb;
-$color-divider: #f2f3f5;
+$color-border: #e6ebf3;
+$color-divider: #f1f4f9;
+
+// ===== 科技感辅助 token（按需使用）=====
+// AI 回复气泡左侧装饰条渐变
+$color-gradient-bubble: linear-gradient(180deg, #4f8bff 0%, #21c7e0 100%);
+// 用户侧气泡底色（交流感）
+$color-chat-user: #eaf1ff;
+// 科技感阴影（带蓝调，比纯黑更通透）
+$shadow-tech: 0 8rpx 30rpx rgba(31, 56, 112, 0.08);
+// 输入框聚焦光晕
+$color-focus-ring: rgba(59, 108, 255, 0.14);
+// 页面顶部光晕（冷蓝，与导航栏底色一致，保证顶部无缝）
+$color-glow-top: #eef3fc;

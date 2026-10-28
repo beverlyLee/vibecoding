@@ -4,6 +4,7 @@
 import Taro from '@tarojs/taro';
 import type { LLMConfig } from '@/types/settings';
 import { getModelParams } from '@/services/sceneConfig';
+import { logger } from '@/utils/logger';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -31,7 +32,7 @@ export function extractJSON<T>(raw: string): T | null {
   const firstBracket = text.indexOf('[');
 
   if (firstBrace === -1 && firstBracket === -1) {
-    console.error('[LLM] JSON 解析失败: 未找到 { 或 [');
+    logger.error('[LLM] JSON 解析失败: 未找到 { 或 [');
     return null;
   }
 
@@ -52,7 +53,7 @@ export function extractJSON<T>(raw: string): T | null {
   try {
     return JSON.parse(text.slice(start, end + 1)) as T;
   } catch (err) {
-    console.error('[LLM] JSON 解析失败:', err, '原文片段:', text.slice(0, 200));
+    logger.error('[LLM] JSON 解析失败', { err: err instanceof Error ? err.message : String(err), len: text.length });
     return null;
   }
 }
@@ -91,9 +92,9 @@ function recordLLMCall(entry: LLMLogEntry): void {
   const head = `${entry.time} [${entry.tag}] ${entry.provider}/${entry.model}(${entry.protocol}) ${entry.latencyMs}ms 入${entry.promptChars}字/出${entry.replyChars}字`;
   const tokens = entry.tokens?.prompt != null ? ` tokens ${entry.tokens.prompt ?? '-'}+${entry.tokens.completion ?? '-'}` : '';
   if (entry.ok) {
-    console.log(`[LLM] ✔ ${head}${tokens} | ${entry.message || ''}`);
+    logger.debug(`[LLM] ✔ ${head}${tokens} | ${entry.message || ''}`);
   } else {
-    console.error(`[LLM] ✘ ${head} | ${entry.message || '未知错误'}`);
+    logger.error(`[LLM] ✘ ${head} | ${entry.message || '未知错误'}`);
   }
 }
 
@@ -112,7 +113,7 @@ export async function chatCompletion(cfg: LLMConfig, messages: ChatMessage[], op
   const tag = opts.tag || '对话';
   const start = Date.now();
   const promptChars = messages.reduce((n, m) => n + (m.content?.length || 0), 0);
-  console.log(`[LLM] → 请求 ${cfg.name}/${cfg.model} [${tag}] ${messages.length}条消息 ${promptChars}字`);
+  logger.debug(`[LLM] → 请求 ${cfg.name}/${cfg.model} [${tag}] ${messages.length}条消息 ${promptChars}字`);
 
   try {
     const reply = cfg.protocol === 'anthropic'
@@ -158,7 +159,7 @@ interface LLMReply {
 // OpenAI 兼容协议（DeepSeek / 智谱 / 通义 / Kimi / OpenAI / 自定义）
 async function callOpenAI(cfg: LLMConfig, messages: ChatMessage[], opts: { temperature: number; maxTokens: number; timeout: number }): Promise<LLMReply> {
   const url = `${cfg.baseURL.replace(/\/+$/, '')}/chat/completions`;
-  console.log('[HTTP] llm.callOpenAI → POST', url, '模型:', cfg.model);
+  logger.debug('[HTTP] llm.callOpenAI → POST', url, '模型:', cfg.model);
   const httpStart = Date.now();
   const res = await Taro.request({
     url,
@@ -178,13 +179,13 @@ async function callOpenAI(cfg: LLMConfig, messages: ChatMessage[], opts: { tempe
   });
   if (res.statusCode >= 400) {
     const errMsg = (res.data && (res.data.error?.message || res.data.message)) || `HTTP ${res.statusCode}`;
-    console.error('[HTTP] llm.callOpenAI ✘', res.statusCode, `${Date.now() - httpStart}ms`, errMsg);
+    logger.error('[HTTP] llm.callOpenAI ✘', res.statusCode, `${Date.now() - httpStart}ms`, errMsg);
     throw new Error(errMsg);
   }
-  console.log('[HTTP] llm.callOpenAI ✔', res.statusCode, `${Date.now() - httpStart}ms`);
+  logger.debug('[HTTP] llm.callOpenAI ✔', res.statusCode, `${Date.now() - httpStart}ms`);
   const content = res.data?.choices?.[0]?.message?.content;
   if (!content) {
-    console.error('[LLM] 响应结构异常:', JSON.stringify(res.data).slice(0, 300));
+    logger.error('[LLM] 响应结构异常:', JSON.stringify(res.data).slice(0, 300));
     throw new Error('模型响应为空');
   }
   const usage = res.data?.usage;
@@ -197,7 +198,7 @@ async function callOpenAI(cfg: LLMConfig, messages: ChatMessage[], opts: { tempe
 // Anthropic 协议
 async function callAnthropic(cfg: LLMConfig, messages: ChatMessage[], opts: { temperature: number; maxTokens: number; timeout: number }): Promise<LLMReply> {
   const url = `${cfg.baseURL.replace(/\/+$/, '')}/v1/messages`;
-  console.log('[HTTP] llm.callAnthropic → POST', url, '模型:', cfg.model);
+  logger.debug('[HTTP] llm.callAnthropic → POST', url, '模型:', cfg.model);
   const httpStart = Date.now();
   const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
   const rest = messages.filter((m) => m.role !== 'system');
@@ -220,14 +221,14 @@ async function callAnthropic(cfg: LLMConfig, messages: ChatMessage[], opts: { te
   });
   if (res.statusCode >= 400) {
     const errMsg = (res.data && (res.data.error?.message || res.data.message)) || `HTTP ${res.statusCode}`;
-    console.error('[HTTP] llm.callAnthropic ✘', res.statusCode, `${Date.now() - httpStart}ms`, errMsg);
+    logger.error('[HTTP] llm.callAnthropic ✘', res.statusCode, `${Date.now() - httpStart}ms`, errMsg);
     throw new Error(errMsg);
   }
-  console.log('[HTTP] llm.callAnthropic ✔', res.statusCode, `${Date.now() - httpStart}ms`);
+  logger.debug('[HTTP] llm.callAnthropic ✔', res.statusCode, `${Date.now() - httpStart}ms`);
   const blocks = res.data?.content;
   const text = Array.isArray(blocks) ? blocks.filter((b: { type: string }) => b.type === 'text').map((b: { text: string }) => b.text).join('') : '';
   if (!text) {
-    console.error('[LLM] 响应结构异常:', JSON.stringify(res.data).slice(0, 300));
+    logger.error('[LLM] 响应结构异常:', JSON.stringify(res.data).slice(0, 300));
     throw new Error('模型响应为空');
   }
   const usage = res.data?.usage;
@@ -253,12 +254,12 @@ export async function testConnection(cfg: LLMConfig): Promise<TestResult> {
       { tag: '连接测试', temperature: 0, maxTokens: 20, timeout: 20000 }
     );
     const latencyMs = Date.now() - start;
-    console.log('[LLM] 连接测试成功:', cfg.name, `${latencyMs}ms`);
+    logger.debug('[LLM] 连接测试成功:', cfg.name, `${latencyMs}ms`);
     return { ok: true, latencyMs, message: `连接成功（${latencyMs}ms）：${reply.slice(0, 30)}` };
   } catch (err) {
     const latencyMs = Date.now() - start;
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[LLM] 连接测试失败:', cfg.name, msg);
+    logger.error('[LLM] 连接测试失败:', cfg.name, msg);
     return { ok: false, latencyMs, message: `连接失败：${msg}` };
   }
 }
@@ -267,13 +268,13 @@ export async function testConnection(cfg: LLMConfig): Promise<TestResult> {
 // 不带音频文件请求 /audio/transcriptions，预期返回 400/422（证明接口存在且鉴权通过）
 // 401/403 说明 Key 无效，404 说明该厂商无音频转写接口
 export async function testAsrConnection(cfg: LLMConfig): Promise<TestResult> {
-  console.log('[API] llm.testAsrConnection ← 入口, 厂商:', cfg.name);
+  logger.debug('[API] llm.testAsrConnection ← 入口, 厂商:', cfg.name);
   const start = Date.now();
   const url = `${cfg.baseURL.replace(/\/+$/, '')}/audio/transcriptions`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20000);
   try {
-    console.log('[LLM] 语音识别接口测试:', url);
+    logger.debug('[LLM] 语音识别接口测试:', url);
     const res = await fetch(url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${cfg.apiKey}` },
@@ -295,7 +296,7 @@ export async function testAsrConnection(cfg: LLMConfig): Promise<TestResult> {
   } catch (err) {
     const latencyMs = Date.now() - start;
     const msg = err instanceof Error && err.name === 'AbortError' ? '请求超时' : err instanceof Error ? err.message : String(err);
-    console.error('[LLM] 语音识别接口测试失败:', msg);
+    logger.error('[LLM] 语音识别接口测试失败:', msg);
     return { ok: false, latencyMs, message: `连接失败：${msg}` };
   } finally {
     clearTimeout(timer);

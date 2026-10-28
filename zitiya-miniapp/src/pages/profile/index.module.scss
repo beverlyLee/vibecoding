@@ -2,7 +2,7 @@
 
 .page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #eaf1ff 0%, $color-bg-page 400rpx);
+  background: linear-gradient(180deg, #eef3fc 0%, $color-bg-page 320rpx);
   padding: 24rpx $page-padding 120rpx;
 }
 
@@ -43,6 +43,24 @@
   font-size: $font-size-xs;
   color: $color-text-tertiary;
   margin-top: $spacing-md;
+}
+
+.guestLoginBtn {
+  margin-top: $spacing-xl;
+  height: 80rpx;
+  border-radius: $radius-md;
+  background: $color-gradient-primary;
+  color: $color-on-primary;
+  font-size: $font-size-md;
+  font-weight: $font-weight-medium;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4rpx 14rpx rgba($color-primary, 0.3);
+
+  &:active {
+    opacity: 0.85;
+  }
 }
 
 // 头卡片（已登录）

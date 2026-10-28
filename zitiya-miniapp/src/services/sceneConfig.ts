@@ -12,6 +12,9 @@ import type { LLMPreset } from '@/types/settings';
 import { LLM_PRESETS } from '@/types/settings';
 import { ATTACK_CATEGORIES, ATTACK_SCENES } from '@/data/attackScenes';
 import type { AttackScene } from '@/data/attackScenes';
+import { userQuotesList } from './userQuotes';
+import { logger } from '@/utils/logger';
+import { authStore, getAuthState } from '@/store/useUserStore';
 
 const CONFIG_KEY = 'zuitiya_scene_config';
 
@@ -68,7 +71,7 @@ export function initCloudConfig(): Promise<void> {
         const data = res.data as CloudSceneConfig;
         if (data && (data.intents?.length || data.fixed_quotes?.length)) {
           _cloudConfig = data;
-          console.log('[SceneConfig] ✅ 云端配置加载:',
+          logger.debug('[SceneConfig] ✅ 云端配置加载:',
             (data.intents?.length || 0), '个意图,',
             (data.fixed_quotes?.length || 0), '条语录,',
             (data.crawl_topics?.length || 0), '个话题'
@@ -77,10 +80,10 @@ export function initCloudConfig(): Promise<void> {
         }
       }
       // H5 或小程序云数据没配 → 用代码默认
-      console.log('[SceneConfig] 使用代码默认配置');
+      logger.debug('[SceneConfig] 使用代码默认配置');
       _cloudConfig = null;
     } catch (err: any) {
-      console.warn('[SceneConfig] 云端加载失败（用默认值）:', err?.message || err);
+      logger.warn('[SceneConfig] 云端加载失败（用默认值）:', err?.message || err);
       _cloudConfig = null;
     }
   })();
@@ -200,7 +203,7 @@ export function loadSceneConfig(): SceneConfigPatch {
       return _cached as SceneConfigPatch;
     }
   } catch (err) {
-    console.warn('[SceneConfig] 读取失败:', err);
+    logger.warn('[SceneConfig] 读取失败:', err);
   }
   _cached = defaultPatch();
   return _cached;
@@ -211,9 +214,9 @@ export function saveSceneConfig(patch: SceneConfigPatch): void {
   try {
     _cached = patch;
     Taro.setStorageSync(CONFIG_KEY, patch);
-    console.log('[SceneConfig] 已保存');
+    logger.debug('[SceneConfig] 已保存');
   } catch (err) {
-    console.warn('[SceneConfig] 保存失败:', err);
+    logger.warn('[SceneConfig] 保存失败:', err);
   }
 }
 
@@ -246,7 +249,7 @@ export function getAllIntentRules(): IntentRule[] {
   if (!result.some((r) => r.key === GENERIC_INTENT_KEY)) {
     const fallback = INTENT_RULES.find((r) => r.key === GENERIC_INTENT_KEY);
     if (fallback) {
-      console.warn('[SceneConfig] 注意到 generic 兜底意图缺失，从代码默认补上');
+      logger.debug('[SceneConfig] generic 兜底意图缺失，从代码默认补上');
       result.push({ ...fallback });
     }
   }
@@ -272,7 +275,7 @@ export function updateIntent(intentKey: string, patchFields: Partial<Omit<Intent
       key: intentKey
     };
     saveSceneConfig(patch);
-    console.log(`[SceneConfig] 已更新自定义意图: ${intentKey}`);
+    logger.debug(`[SceneConfig] 已更新自定义意图: ${intentKey}`);
     return;
   }
 
@@ -289,7 +292,7 @@ export function updateIntent(intentKey: string, patchFields: Partial<Omit<Intent
     };
   }
   saveSceneConfig(patch);
-  console.log(`[SceneConfig] 已覆盖默认意图字段: ${intentKey}`);
+  logger.debug(`[SceneConfig] 已覆盖默认意图字段: ${intentKey}`);
 }
 
 /** 新增一个自定义意图 */
@@ -326,14 +329,14 @@ export function addIntent(rule: Omit<IntentRule, 'key'> & { key?: string }): Int
 
   patch.customIntents.push(newRule);
   saveSceneConfig(patch);
-  console.log(`[SceneConfig] 已新增自定义意图: ${key} (${newRule.name})`);
+  logger.debug(`[SceneConfig] 已新增自定义意图: ${key} (${newRule.name})`);
   return newRule;
 }
 
 /** 删除一个自定义意图（默认的删不动，generic 也删不动） */
 export function removeIntent(intentKey: string): boolean {
   if (intentKey === GENERIC_INTENT_KEY) {
-    console.warn('[SceneConfig] 不能删除万能兜底意图');
+    logger.warn('[SceneConfig] 不能删除万能兜底意图');
     return false;
   }
   const patch = loadSceneConfig();
@@ -344,7 +347,7 @@ export function removeIntent(intentKey: string): boolean {
     delete patch.keywordOverrides[intentKey];
     delete patch.intentOverrides[intentKey];
     saveSceneConfig(patch);
-    console.log(`[SceneConfig] 已还原默认意图: ${intentKey}`);
+    logger.debug(`[SceneConfig] 已还原默认意图: ${intentKey}`);
     return true;
   }
 
@@ -352,7 +355,7 @@ export function removeIntent(intentKey: string): boolean {
   if (customIdx >= 0) {
     patch.customIntents.splice(customIdx, 1);
     saveSceneConfig(patch);
-    console.log(`[SceneConfig] 已删除自定义意图: ${intentKey}`);
+    logger.debug(`[SceneConfig] 已删除自定义意图: ${intentKey}`);
     return true;
   }
 
@@ -433,7 +436,7 @@ export function addFixedQuote(quote: Omit<Quote, 'id' | 'source'> & { source?: '
   };
   patch.customQuotes.push(newQuote);
   saveSceneConfig(patch);
-  console.log('[SceneConfig] 已新增固定语录:', newQuote.content.slice(0, 20));
+  logger.debug('[SceneConfig] 已新增固定语录, 长度', (newQuote.content || '').length);
   return newQuote;
 }
 
@@ -447,6 +450,95 @@ export function removeFixedQuote(id: string): boolean {
     return true;
   }
   return false;
+}
+
+// ================================================================
+// 用户自建语录（user_quotes 云端集合，按 openid 隔离）
+// ================================================================
+
+let _userQuotesCache: Quote[] | null = null;
+let _userQuotesPromise: Promise<void> | null = null;
+
+/**
+ * 加载当前登录用户的自建语录到内存缓存
+ * 未登录或 H5 环境直接跳过（返回空数组不报错）
+ * 失败不阻塞调用方，降级为空
+ */
+export function initUserQuotes(force = false): Promise<void> {
+  // 强制刷新时走一次
+  if (!force && _userQuotesCache) {
+    logger.debug('[initUserQuotes] ✅ 命中内存缓存', _userQuotesCache.length, '条');
+    return Promise.resolve();
+  }
+
+  // 如果 auth 还在初始化，等它一下再决定（避免 race condition 导致提前缓存空数组）
+  const waitForAuthReady = (maxMs = 3000): Promise<void> => new Promise((resolve) => {
+    const start = Date.now();
+    const tick = () => {
+      const st = getAuthState().status;
+      if (st !== 'authenticating' || Date.now() - start > maxMs) {
+        resolve();
+        return;
+      }
+      setTimeout(tick, 200);
+    };
+    tick();
+  });
+
+  return (async () => {
+    if (getAuthState().status === 'authenticating') {
+      logger.debug('[initUserQuotes] auth 还在初始化，等待就绪...');
+      await waitForAuthReady();
+    }
+
+    // 未登录：缓存空数组，漏斗匹配时自然跳过
+    const loggedIn = authStore.isLoggedIn();
+    const status = getAuthState().status;
+    logger.debug('[initUserQuotes] 检查登录状态 isLoggedIn=', loggedIn, 'storeStatus=', status);
+    if (!loggedIn) {
+      logger.warn('[initUserQuotes] ⚠️ 未登录，跳过加载');
+      _userQuotesCache = [];
+      return;
+    }
+
+    if (_userQuotesPromise) {
+      logger.debug('[initUserQuotes] ⏳ 已有请求在飞');
+      await _userQuotesPromise;
+      return;
+    }
+
+    _userQuotesPromise = (async () => {
+      try {
+        if (process.env.TARO_ENV === 'weapp' && typeof Taro !== 'undefined' && Taro.cloud) {
+          logger.debug('[initUserQuotes] 📡 开始拉 user_quotes.list ...');
+          const list = await userQuotesList();
+          _userQuotesCache = list || [];
+          logger.debug('[initUserQuotes] ✅ 拉到', _userQuotesCache.length, '条');
+        } else {
+          logger.warn('[initUserQuotes] ⚠️ 环境不是 weapp 或 Taro.cloud 不存在，用空');
+          _userQuotesCache = [];
+        }
+      } catch (err: any) {
+        logger.error('[initUserQuotes] ❌ userQuotesList 失败:', err?.code, err?.message, err);
+        _userQuotesCache = [];
+      } finally {
+        _userQuotesPromise = null;
+      }
+    })();
+
+    await _userQuotesPromise;
+  })();
+}
+
+/** 获取当前用户自建语录（已缓存，未加载则返回空） */
+export function getAllUserQuotes(): Quote[] {
+  return _userQuotesCache ?? [];
+}
+
+/** 新增/更新/删除后调用，让后续读取拿到最新数据 */
+export function invalidateUserQuotes(): void {
+  _userQuotesCache = null;
+  // 下次 initUserQuotes 会重新拉
 }
 
 // ================================================================
@@ -466,7 +558,7 @@ export function setCrawlTopics(topics: string[]): void {
   const patch = loadSceneConfig();
   patch.crawlTopics = topics.filter((t) => t.trim());
   saveSceneConfig(patch);
-  console.log('[SceneConfig] 已设置爬虫话题:', patch.crawlTopics);
+  logger.debug('[SceneConfig] 已设置爬虫话题:', patch.crawlTopics);
 }
 
 /** 追加一个话题 */
@@ -477,7 +569,7 @@ export function addCrawlTopic(topic: string): void {
   if (!current.includes(topic)) {
     patch.crawlTopics = [...current, topic];
     saveSceneConfig(patch);
-    console.log(`[SceneConfig] 已追加话题: ${topic}`);
+    logger.debug(`[SceneConfig] 已追加话题: ${topic}`);
   }
 }
 
@@ -523,30 +615,30 @@ export function setDailyQuoteTTLDays(d: number): void {
 export function resetSceneConfig(): void {
   _cached = defaultPatch();
   try { Taro.removeStorageSync(CONFIG_KEY); } catch {}
-  console.log('[SceneConfig] 已重置为默认值');
+  logger.debug('[SceneConfig] 已重置为默认值');
 }
 
 export function dumpSceneConfig(): void {
   const patch = loadSceneConfig();
   const rules = getAllIntentRules();
   console.group('🦆 SceneConfig 快照');
-  console.log('Storage 覆盖:', patch);
-  console.log('完整意图规则 (', rules.length, '个):');
+  logger.debug('Storage 覆盖:', patch);
+  logger.debug('完整意图规则 (', rules.length, '个):');
   for (const r of rules) {
     const isCustom = patch.customIntents.some((c) => c.key === r.key);
     const isOverridden = !isCustom && (
       patch.keywordOverrides[r.key] || patch.intentOverrides[r.key]
     );
     const flag = isCustom ? ' 🆕新增' : isOverridden ? ' ⚡已覆盖' : '';
-    console.log(`  ${r.key} (${r.name}) w=${r.weight}${flag}`);
-    console.log(`    keywords: [${r.keywords.join(', ')}]`);
+    logger.debug(`  ${r.key} (${r.name}) w=${r.weight}${flag}`);
+    logger.debug(`    keywords: [${r.keywords.join(', ')}]`);
   }
-  console.log('自定义语录:', patch.customQuotes.length, '条');
+  logger.debug('自定义语录:', patch.customQuotes.length, '条');
 
   // prompts
   const overriddenPrompts = Object.keys(patch.prompts || {});
   if (overriddenPrompts.length > 0) {
-    console.log('覆盖的 prompt:', overriddenPrompts);
+    logger.debug('覆盖的 prompt:', overriddenPrompts);
   }
   console.groupEnd();
 }
@@ -581,7 +673,7 @@ export function setPrompt(key: string, value: string): void {
   if (!patch.prompts) patch.prompts = {};
   patch.prompts[key] = value;
   saveSceneConfig(patch);
-  console.log(`[SceneConfig] 已覆盖 prompt: ${key}`);
+  logger.debug(`[SceneConfig] 已覆盖 prompt: ${key}`);
 }
 
 /** 删除某个 prompt 的覆盖（还原默认） */
@@ -594,7 +686,7 @@ export function resetPrompt(key: string): void {
       delete patch.prompts;
     }
     saveSceneConfig(patch);
-    console.log(`[SceneConfig] 已还原 prompt: ${key}`);
+    logger.debug(`[SceneConfig] 已还原 prompt: ${key}`);
   }
 }
 

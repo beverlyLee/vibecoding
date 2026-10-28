@@ -7,6 +7,7 @@
 
 import Taro from '@tarojs/taro';
 import type { LLMConfig } from '@/types/settings';
+import { logger } from '@/utils/logger';
 
 export interface SpeechCallbacks {
   // partial 为当前完整转写文本（已定稿 + 进行中）
@@ -66,7 +67,7 @@ function resolveAsrModel(cfg: LLMConfig): string {
 async function transcribeWithWhisper(cfg: LLMConfig, blob: Blob): Promise<string> {
   const url = `${cfg.baseURL.replace(/\/+$/, '')}/audio/transcriptions`;
   const model = resolveAsrModel(cfg);
-  console.log('[Speech] Whisper 转写请求:', url, '模型:', model, `音频大小 ${(blob.size / 1024).toFixed(1)}KB`);
+  logger.debug('[Speech] Whisper 转写请求:', url, '模型:', model, `音频大小 ${(blob.size / 1024).toFixed(1)}KB`);
   const formData = new FormData();
   formData.append('file', blob, 'recording.webm');
   formData.append('model', model);
@@ -117,7 +118,7 @@ export class SpeechRecognizer {
   constructor(whisperCfg?: LLMConfig | null) {
     this.whisperCfg = whisperCfg || null;
     this.mode = process.env.TARO_ENV === 'weapp' ? 'weapp' : 'h5';
-    console.log('[Speech] 语音模式:', this.mode, this.whisperCfg ? '(含云端转写兜底)' : '');
+    logger.debug('[Speech] 语音模式:', this.mode, this.whisperCfg ? '(含云端转写兜底)' : '');
   }
 
   getMode(): SpeechMode {
@@ -158,7 +159,7 @@ export class SpeechRecognizer {
           this.weappManager?.stop();
         }
       } catch (err) {
-        console.error('[Speech] 小程序停止失败:', err);
+        logger.error('[Speech] 小程序停止失败:', err);
       }
       return;
     }
@@ -168,7 +169,7 @@ export class SpeechRecognizer {
         this.recog.onend = null;
         this.recog.stop();
       } catch (err) {
-        console.error('[Speech] H5 识别停止失败:', err);
+        logger.error('[Speech] H5 识别停止失败:', err);
       }
     }
     // 停止录音，录音结束后决定最终文本
@@ -186,12 +187,12 @@ export class SpeechRecognizer {
       this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (err) {
       const name = (err as DOMException)?.name || '';
-      console.error('[Speech] 获取麦克风失败:', name, err);
+      logger.error('[Speech] 获取麦克风失败:', name, err);
       if (name === 'NotAllowedError') throw new Error('麦克风权限被拒绝，请在浏览器地址栏允许麦克风后重试');
       if (name === 'NotFoundError') throw new Error('未检测到麦克风设备');
       throw new Error('麦克风不可用，请检查设备');
     }
-    console.log('[Speech] 麦克风采集已开始');
+    logger.debug('[Speech] 麦克风采集已开始');
 
     // 2. MediaRecorder 录制真实音频（兜底云端转写用）
     this.chunks = [];
@@ -203,7 +204,7 @@ export class SpeechRecognizer {
       };
       this.recorder.start(500);
     } catch (err) {
-      console.error('[Speech] MediaRecorder 启动失败（不影响浏览器识别）:', err);
+      logger.error('[Speech] MediaRecorder 启动失败（不影响浏览器识别）:', err);
       this.recorder = null;
     }
 
@@ -212,13 +213,13 @@ export class SpeechRecognizer {
     if (Ctor) {
       this.startBrowserRecognition(Ctor);
     } else {
-      console.warn('[Speech] 浏览器不支持 Web Speech API，将在停止录音后走云端转写');
+      logger.warn('[Speech] 浏览器不支持 Web Speech API，将在停止录音后走云端转写');
       this.speechFailed = true;
     }
 
     // 最长录音保护
     this.maxTimer = setTimeout(() => {
-      console.log('[Speech] 达到最长录音时长，自动停止');
+      logger.debug('[Speech] 达到最长录音时长，自动停止');
       this.stop();
     }, MAX_DURATION);
   }
@@ -242,7 +243,7 @@ export class SpeechRecognizer {
         this.callbacks?.onPartial(this.finalText + partial);
       };
       recog.onerror = (e) => {
-        console.error('[Speech] 浏览器识别错误:', e.error);
+        logger.error('[Speech] 浏览器识别错误:', e.error);
         // network/service-not-allowed：Chrome 识别服务在国内网络常见失败
         // 不打断录音，停止后走云端 Whisper 兜底
         if (e.error === 'not-allowed' || e.error === 'audio-capture') {
@@ -258,16 +259,16 @@ export class SpeechRecognizer {
           try {
             recog.start();
           } catch (err) {
-            console.error('[Speech] 续录失败:', err);
+            logger.error('[Speech] 续录失败:', err);
             this.speechFailed = true;
           }
         }
       };
       this.recog = recog;
       recog.start();
-      console.log('[Speech] 浏览器实时识别已启动');
+      logger.debug('[Speech] 浏览器实时识别已启动');
     } catch (err) {
-      console.error('[Speech] 浏览器识别启动异常:', err);
+      logger.error('[Speech] 浏览器识别启动异常:', err);
       this.recog = null;
       this.speechFailed = true;
     }
@@ -277,18 +278,18 @@ export class SpeechRecognizer {
     const finish = (blob: Blob | null) => {
       this.releaseMic();
       if (this.finalText.trim()) {
-        console.log('[Speech] 浏览器识别完成:', this.finalText.slice(0, 50));
+        logger.debug('[Speech] 浏览器识别完成:', this.finalText.slice(0, 50));
         this.callbacks?.onFinal(this.finalText.trim());
         return;
       }
       // 浏览器识别没出文字：尝试云端 Whisper 兜底
       if (blob && blob.size > 0 && this.whisperCfg) {
-        console.log('[Speech] 走云端 Whisper 转写…');
+        logger.debug('[Speech] 走云端 Whisper 转写…');
         transcribeWithWhisper(this.whisperCfg, blob)
           .then((text) => this.callbacks?.onFinal(text))
           .catch((err) => {
             const msg = err instanceof Error ? err.message : String(err);
-            console.error('[Speech] 云端转写失败:', msg);
+            logger.error('[Speech] 云端转写失败:', msg);
             this.callbacks?.onError(
               `语音识别失败（浏览器识别不可用，云端转写失败：${msg}）。建议使用最新版 Chrome 并确保网络可访问识别服务`
             );
@@ -310,7 +311,7 @@ export class SpeechRecognizer {
       try {
         this.recorder.stop();
       } catch (err) {
-        console.error('[Speech] 录音停止失败:', err);
+        logger.error('[Speech] 录音停止失败:', err);
         finish(null);
       }
     } else {
@@ -346,10 +347,10 @@ export class SpeechRecognizer {
         this.callbacks?.onFinal(this.finalText);
       };
       manager.onError = (res) => {
-        console.error('[Speech] 插件识别错误:', res.msg);
+        logger.error('[Speech] 插件识别错误:', res.msg);
         // 插件不可用（如测试号无插件权限），降级为录音 + 云端转写
         if (!this.finalText && this.whisperCfg) {
-          console.log('[Speech] 插件不可用，降级为 RecorderManager 录音 + 云端转写');
+          logger.debug('[Speech] 插件不可用，降级为 RecorderManager 录音 + 云端转写');
           this.weappManager = null;
           this.startWeappRecorderFallback();
           return;
@@ -359,9 +360,9 @@ export class SpeechRecognizer {
       };
       manager.start({ duration: MAX_DURATION, lang: 'zh_CN' });
       this.weappManager = manager;
-      console.log('[Speech] 小程序语音识别已启动（同声传译插件）');
+      logger.debug('[Speech] 小程序语音识别已启动（同声传译插件）');
     } catch (err) {
-      console.error('[Speech] 插件加载异常:', err);
+      logger.error('[Speech] 插件加载异常:', err);
       // requirePlugin 直接抛错（插件未注册/无权限），走降级
       this.startWeappRecorderFallback();
     }
@@ -378,11 +379,11 @@ export class SpeechRecognizer {
     this.weappUseRecorder = true;
     this.weappRecorder = recorder;
     recorder.onStop((res) => {
-      console.log('[Speech] 小程序录音结束:', res.tempFilePath, `${((res.duration || 0) / 1000).toFixed(1)}s`);
+      logger.debug('[Speech] 小程序录音结束:', res.tempFilePath, `${((res.duration || 0) / 1000).toFixed(1)}s`);
       this.uploadWeappAudio(res.tempFilePath);
     });
     recorder.onError((res) => {
-      console.error('[Speech] 小程序录音错误:', res.errMsg);
+      logger.error('[Speech] 小程序录音错误:', res.errMsg);
       this.running = false;
       this.weappUseRecorder = false;
       const msg = res.errMsg || '';
@@ -398,7 +399,7 @@ export class SpeechRecognizer {
       sampleRate: 16000,
       numberOfChannels: 1
     });
-    console.log('[Speech] 小程序录音已启动（降级模式，停止后云端转写）');
+    logger.debug('[Speech] 小程序录音已启动（降级模式，停止后云端转写）');
   }
 
   // 把录音文件上传到 Whisper 兼容接口
@@ -407,7 +408,7 @@ export class SpeechRecognizer {
     if (!cfg) return;
     const url = `${cfg.baseURL.replace(/\/+$/, '')}/audio/transcriptions`;
     const model = resolveAsrModel(cfg);
-    console.log('[Speech] 上传小程序录音到云端转写:', url, '模型:', model);
+    logger.debug('[Speech] 上传小程序录音到云端转写:', url, '模型:', model);
     Taro.uploadFile({
       url,
       filePath,
@@ -419,19 +420,19 @@ export class SpeechRecognizer {
           const data = JSON.parse(res.data);
           const text = (data.text || '').trim();
           if (text) {
-            console.log('[Speech] 云端转写成功:', text.slice(0, 50));
+            logger.debug('[Speech] 云端转写成功, 长度', (text || '').length);
             this.callbacks?.onFinal(text);
           } else {
             const msg = data.error?.message || data.message || '云端识别结果为空';
             this.callbacks?.onError(`云端转写失败：${msg}`);
           }
         } catch (err) {
-          console.error('[Speech] 云端响应解析失败:', res.data.slice(0, 200));
+          logger.error('[Speech] 云端响应解析失败, 长度', (res.data || '').length);
           this.callbacks?.onError('云端转写响应解析失败，请检查识别模型配置');
         }
       },
       fail: (err) => {
-        console.error('[Speech] 上传录音失败:', err.errMsg);
+        logger.error('[Speech] 上传录音失败:', err.errMsg);
         this.callbacks?.onError(`云端转写请求失败：${err.errMsg || '网络错误'}（请确认已在详情中勾选不校验合法域名，或将厂商域名加入 uploadFile 合法域名）`);
       }
     });

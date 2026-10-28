@@ -114,9 +114,14 @@
 .footer {
   margin-top: $spacing-xl;
   padding: $spacing-lg;
-  background: #FFF8E1;
+  background: #EEF3FF;
   border-radius: $radius-md;
   font-size: $font-size-xs;
   color: $color-text-tertiary;
   line-height: $line-height-loose;
+}
+
+.strong {
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
 }

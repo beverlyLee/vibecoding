@@ -4,6 +4,7 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import { useUserStore } from '@/store/useUserStore';
 import { useLoginSheet } from '@/hooks/useLoginSheet';
 import logoDuck from '@/assets/logo.png';
+import SettingsPanel from '@/components/SettingsPanel';
 import styles from './index.module.scss';
 
 const ROLE_LABEL: Record<string, string> = {
@@ -12,13 +13,10 @@ const ROLE_LABEL: Record<string, string> = {
   user: ''
 };
 
-// 我的页：游客态极简卡片，点任何需要登录的功能会自动弹出全局底部登录层
+// 我的页：游客态极简卡片，点击登录按钮弹全局底部登录层
 // 已登录显示档案 + 菜单
 export default function ProfilePage() {
-  const status = useUserStore((s) => s.status);
-  const user = useUserStore((s) => s.user);
-  const logout = useUserStore((s) => s.logout);
-  const updateProfile = useUserStore((s) => s.updateProfile);
+  const { status, user, logout, updateProfile } = useUserStore();
 
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState('');
@@ -28,13 +26,6 @@ export default function ProfilePage() {
 
   const isLoggedIn = status === 'authenticated' && !!user;
   const isStaff = isLoggedIn && user && (user.role === 'admin' || user.role === 'operator');
-
-  // 切换到"我的"页面时，如果未登录自动弹出登录弹层
-  useDidShow(() => {
-    if (!isLoggedIn) {
-      Taro.eventCenter.trigger('zuitiya:loginSheet', {});
-    }
-  });
 
   const startEdit = () => {
     setEditName(user?.nickname || '');
@@ -94,9 +85,15 @@ export default function ProfilePage() {
             <Image className={styles.guestLogo} src={logoDuck} mode='aspectFit' />
             <Text className={styles.guestTitle}>欢迎来到嘴替鸭</Text>
             <Text className={styles.guestDesc}>
-              登录后可使用拆招、出招等全部功能
+              登录后可使用拆招、出招、保存语录等全部功能
             </Text>
             <Text className={styles.guestHint}>已登录的微信账号会自动识别</Text>
+            <View
+              className={styles.guestLoginBtn}
+              onClick={() => Taro.eventCenter.trigger('zuitiya:loginSheet', { reason: '欢迎登录' })}
+            >
+              <Text>微信一键登录</Text>
+            </View>
           </View>
         </View>
         {loginSheet}
@@ -181,6 +178,9 @@ export default function ProfilePage() {
             <Text className={styles.menuLabel}>退出登录</Text>
           </View>
         </View>
+
+        <View className={styles.sectionTitle}>模型配置</View>
+        <SettingsPanel />
       </View>
       {loginSheet}
     </>

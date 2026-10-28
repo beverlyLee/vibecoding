@@ -10,6 +10,7 @@ import { funnelForEngine } from '@/services/quoteFunnel';
 import { getKeywordsFor, getAllIntentRules, getPrompt, getModelParams, initCloudConfig } from '@/services/sceneConfig';
 import { filterResponses } from '@/services/contentFilter';
 import { matchInDailyPool, hasDailyPool } from '@/services/dailyIntentPool';
+import { logger } from '@/utils/logger';
 
 const VALID_STYLES: ResponseStyle[] = ['gentle', 'humor', 'direct', 'counter'];
 
@@ -56,11 +57,11 @@ async function llmAnalyze(utterance: string): Promise<Omit<AnalysisResult, 'id' 
     ],
     { tag: '拆招分析', ...getModelParams('analyze') }
   );
-  console.log('[Engine] LLM 原始返回耗时', Date.now() - startTime, 'ms');
+  logger.debug('[Engine] LLM 原始返回耗时', Date.now() - startTime, 'ms');
 
   const payload = extractJSON<LLMAnalysisPayload>(raw);
   if (!payload || !payload.responses || !Array.isArray(payload.responses) || payload.responses.length === 0) {
-    console.error('[Engine] LLM 返回内容无法解析为有效结果:', raw.slice(0, 300));
+    logger.error('[Engine] LLM 返回解析失败', { len: (raw || '').length });
     throw new Error('LLM 返回解析失败');
   }
 
@@ -81,7 +82,7 @@ async function llmAnalyze(utterance: string): Promise<Omit<AnalysisResult, 'id' 
   const intentList = normalizeIntentLabels(rawIntents);
   if (intentList.length === 0) intentList.push('未识别场景');
 
-  console.log(`[Engine] LLM 分析结果: 意图 ${JSON.stringify(intentList)} 强度 ${payload.intensity}，有效回话 ${responses.length} 条`);
+  logger.debug(`[Engine] LLM 分析结果: 意图 ${JSON.stringify(intentList)} 强度 ${payload.intensity}，有效回话 ${responses.length} 条`);
 
   return {
     intent: intentList,
@@ -167,7 +168,7 @@ function ruleAnalyze(
   rule: IntentRule,
   allIntentNames: string[]
 ): Omit<AnalysisResult, 'id' | 'costMs' | 'utterance'> {
-  console.log('[Engine] 采用规则结果:', rule.key, rule.name, allIntentNames.length > 1 ? `（共命中 ${allIntentNames.length} 个）` : '');
+  logger.debug('[Engine] 采用规则结果:', rule.key, rule.name, allIntentNames.length > 1 ? `（共命中 ${allIntentNames.length} 个）` : '');
   const now = Date.now();
   const responses: Response[] = rule.responses.map((r, i) => ({
     ...r,
@@ -187,7 +188,7 @@ function ruleAnalyze(
 // 拆招分析：意图判定走三层漏斗（L1 固定规则 → L2 每日热词 → L3 LLM），
 // 每一层无命中/没配置/失败则下钻下一层
 export async function analyzeUtterance(utterance: string): Promise<AnalysisResult> {
-  console.log('[API] engine.analyzeUtterance ← 入口, 输入', utterance.trim().length, '字');
+  logger.debug('[API] engine.analyzeUtterance ← 入口, 输入', utterance.trim().length, '字');
   const text = utterance.trim();
   if (!text) throw new Error('输入为空');
   // 确保云端场景配置（意图集/语录集）已加载，避免冷启动竞态导致不同设备结果不一致
@@ -210,23 +211,33 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
   // 决策日志
   if (hasFixedHit) {
     const desc = fixedRanked.slice(0, 5).map((r) => `${r.name}(score=${r.score},hits=${r.hits})`).join(' / ');
-    console.log(`[Engine] L1 固定规则命中: ${desc}`);
+    logger.debug(`[Engine] L1 固定规则命中: ${desc}`);
   } else if (hasDailyHit) {
-    console.log(`[Engine] L1 无命中, L2 daily 命中 ${dailyMatches!.matchedQuotes.length} 条, intent_keys=[${dailyMatches!.hitIntentKeys.join(',')}]`);
+    logger.debug(`[Engine] L1 无命中, L2 daily 命中 ${dailyMatches!.matchedQuotes.length} 条, intent_keys=[${dailyMatches!.hitIntentKeys.join(',')}]`);
   } else {
-    console.log('[Engine] L1+L2 均无命中 → 走 L3 LLM 或兜底');
+    logger.debug('[Engine] L1+L2 均无命中 → 走 L3 LLM 或兜底');
   }
 
-  // ========== 语录金句漏斗（固定库 → 每日库，仅拉两层，不走 LLM）==========
-  const funnelHit = await funnelForEngine(text, fixedRule.key);
-  let funnelQuotes: string[] = [];
+  // ========== 语录金句漏斗（L1: 固定+用户自建 → L2: 每日库）==========
+  let funnelHit = await funnelForEngine(text, fixedRule.key);
   let funnelSourceTag = '';
   if (funnelHit?.quotes?.length) {
-    funnelQuotes = funnelHit.quotes.map((q) => q.content);
-    funnelSourceTag = funnelHit.hitLayer === 'fixed' ? '📚 固定语录' : '🔥 社区热话';
-    console.log(`[Engine] 语录漏斗命中 (${funnelHit.hitLayer}): ${funnelQuotes.length} 条推荐金句`);
+    const hitQuotes = funnelHit.quotes;
+    const hasUserQuote = hitQuotes.some((q) => q.source === 'user');
+    const hasFixedQuote = hitQuotes.some((q) => !q.source || q.source !== 'user');
+
+    if (funnelHit.hitLayer === 'daily') {
+      funnelSourceTag = '🔥 社区热话';
+    } else if (hasUserQuote && !hasFixedQuote) {
+      funnelSourceTag = '✨ 我的语录';
+    } else if (hasUserQuote && hasFixedQuote) {
+      funnelSourceTag = '📚 固定 + ✨ 我的语录';
+    } else {
+      funnelSourceTag = '📚 固定语录';
+    }
+    logger.debug(`[Engine] 语录漏斗命中 (${funnelHit.hitLayer}): ${hitQuotes.length} 条, tag=${funnelSourceTag}`);
   } else {
-    console.log('[Engine] 语录漏斗无命中');
+    logger.debug('[Engine] 语录漏斗无命中');
   }
 
   // ========== 核心回话生成 ==========
@@ -236,7 +247,7 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
   if (hasFixedHit) {
     // === L1 命中 → 秒回用最高分的规则模板，不碰 L2/L3/LLM ===
     const allRuleIntentNames = fixedRanked.map((r) => r.name);
-    console.log('[Engine] L1 命中 → 用「' + fixedRule.name + '」模板回话');
+    logger.debug('[Engine] L1 命中 → 用「' + fixedRule.name + '」模板回话');
     baseResult = ruleAnalyze(text, fixedRule, allRuleIntentNames);
     source = 'rule';
   } else if (hasDailyHit) {
@@ -255,20 +266,27 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
 
     if (dailyContents.length > 0) {
       // daily 自带可用金句，追加到回话末尾
-      console.log('[Engine] L2 daily 命中 + 有 content → generic 模板 + daily 金句');
+      logger.debug('[Engine] L2 daily 命中 + 有 content → generic 模板 + daily 金句');
       baseResult = ruleAnalyze(text, fixedRule, l2IntentNames);
       source = 'rule';
-      funnelQuotes = dailyContents.slice(0, 2);
+      // 把 daily 金句塞到 funnelHit 里，让后面的统一追加逻辑处理
+      if (!funnelHit) {
+        funnelHit = {
+          quotes: dailyMatches!.matchedQuotes.slice(0, 2),
+          hitLayer: 'daily',
+          costMs: 0,
+        };
+      }
       funnelSourceTag = '🔥 社区热话';
     } else {
       // daily 命中但内容空洞，还是 generic 模板，不调 LLM
-      console.log('[Engine] L2 daily 命中但 content 空洞 → generic 模板');
+      logger.debug('[Engine] L2 daily 命中但 content 空洞 → generic 模板');
       baseResult = ruleAnalyze(text, fixedRule, l2IntentNames);
       source = 'rule';
     }
   } else if (cfg) {
     // === L1+L2 均零命中 + 配了 LLM → L3 调 LLM（这是唯一调 LLM 的地方）===
-    console.log('[Engine] L1+L2 均无命中 + 有 LLM → L3 调大模型');
+    logger.debug('[Engine] L1+L2 均无命中 + 有 LLM → L3 调大模型');
     try {
       baseResult = await llmAnalyze(text);
       if (!baseResult.intent || baseResult.intent.length === 0) {
@@ -276,28 +294,28 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
       }
       source = 'llm';
     } catch (err) {
-      console.error('[Engine] L3 LLM 失败, 降级万能兜底:', err instanceof Error ? err.message : err);
+      logger.error('[Engine] L3 LLM 失败, 降级万能兜底:', err instanceof Error ? err.message : err);
       baseResult = ruleAnalyze(text, fixedRule, ['未识别场景']);
       source = 'fallback';
     }
   } else {
     // === L1+L2 均零命中 + 没配 LLM → 真兜底（source 标明是没配 LLM）===
-    console.log('[Engine] 所有层均无命中 + 无 LLM → 万能兜底模板（提示用户配置 LLM）');
+    logger.debug('[Engine] 所有层均无命中 + 无 LLM → 万能兜底模板（提示用户配置 LLM）');
     baseResult = ruleAnalyze(text, fixedRule, ['未识别场景']);
     source = 'fallback_no_llm';
   }
 
   // ========== 把语录漏斗命中的推荐金句追加到 responses 末尾 ==========
-  if (funnelQuotes.length > 0) {
+  if (funnelHit?.quotes?.length) {
     const existingTexts = new Set(baseResult.responses.map((r) => r.text));
-    const extras = funnelQuotes
-      .filter((q) => !existingTexts.has(q))   // 去重
-      .slice(0, 2)                           // 最多加 2 条推荐金句
+    const extras = funnelHit.quotes
+      .filter((q) => !existingTexts.has(q.content))   // 去重
+      .slice(0, 2)                                   // 最多加 2 条推荐金句
       .map((q, i) => ({
         id: `${Date.now()}_funnel_${i}`,
         style: 'gentle' as ResponseStyle,
-        text: q,
-        reason: `${funnelSourceTag} · 推荐金句`,
+        text: q.content,
+        reason: q.source === 'user' ? '✨ 我的语录 · 推荐金句' : `${funnelSourceTag} · 推荐金句`,
       }));
     baseResult.responses = [...baseResult.responses, ...extras];
   }
@@ -305,7 +323,7 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
   // ========== 内容安全审查（只拦截，不额外补内容） ==========
   const { safe, blocked } = filterResponses(baseResult.responses);
   if (blocked > 0) {
-    console.warn(`[Engine] 内容安全过滤: 拦截 ${blocked} 条, 剩余 ${safe.length} 条`);
+    logger.warn(`[Engine] 内容安全过滤: 拦截 ${blocked} 条, 剩余 ${safe.length} 条`);
   }
   baseResult.responses = safe;
 
@@ -327,7 +345,7 @@ export async function rephraseResponse(
   response: Response,
   currentText: string
 ): Promise<string> {
-  console.log('[API] engine.rephraseResponse ← 入口, 风格', response.style);
+  logger.debug('[API] engine.rephraseResponse ← 入口, 风格', response.style);
   const cfg = useAppStore.getState().getActiveLLM();
   if (cfg) {
     try {
@@ -353,12 +371,12 @@ export async function rephraseResponse(
       );
       const payload = extractJSON<{ text?: string }>(raw);
       if (payload && payload.text && payload.text.trim()) {
-        console.log('[Engine] 换说法成功(LLM)');
+        logger.debug('[Engine] 换说法成功(LLM)');
         return payload.text.trim();
       }
-      console.error('[Engine] 换说法返回解析失败:', raw.slice(0, 200));
+      logger.error('[Engine] 换说法解析失败', { len: (raw || '').length });
     } catch (err) {
-      console.error('[Engine] 换说法 LLM 调用失败:', err);
+      logger.error('[Engine] 换说法 LLM 调用失败:', err instanceof Error ? err.message : err);
     }
   }
   // 降级：从内置备选轮换
@@ -366,7 +384,7 @@ export async function rephraseResponse(
   if (variants.length > 0) {
     const idx = variants.indexOf(currentText);
     const next = variants[(idx + 1) % variants.length];
-    console.log('[Engine] 换说法成功(规则备选)');
+    logger.debug('[Engine] 换说法成功(规则备选)');
     return next;
   }
   return currentText;
@@ -376,10 +394,10 @@ export async function rephraseResponse(
 export async function copyText(text: string): Promise<boolean> {
   try {
     await Taro.setClipboardData({ data: text });
-    console.log('[Engine] 已复制到剪贴板');
+    logger.debug('[Engine] 已复制到剪贴板');
     return true;
   } catch (err) {
-    console.error('[Engine] 复制失败:', err);
+    logger.error('[Engine] 复制失败:', err instanceof Error ? err.message : err);
     return false;
   }
 }
