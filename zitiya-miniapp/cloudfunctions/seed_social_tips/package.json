@@ -1,0 +1,10 @@
+{
+  "name": "seed_social_tips",
+  "version": "1.0.0",
+  "private": true,
+  "description": "嘴替鸭社交小知识系统兜底种子云函数",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

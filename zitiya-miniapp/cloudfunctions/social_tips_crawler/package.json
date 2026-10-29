@@ -1,0 +1,10 @@
+{
+  "name": "social_tips_crawler",
+  "version": "1.0.0",
+  "private": true,
+  "description": "嘴替鸭社交小知识每日爬虫云函数",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

@@ -12,6 +12,7 @@ function sourceLabel(source: string): string {
   switch (source) {
     case 'llm': return '🧠 大模型分析';
     case 'rule': return '🦆 内置规则';
+    case 'user_quote': return '✨ 我的语录';
     case 'fallback': return '🛟 兜底（AI 暂不可用）';
     case 'fallback_no_llm': return '🛟 兜底（未配置大模型）';
     default: return '🦆 内置规则';

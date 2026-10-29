@@ -167,6 +167,64 @@
   margin-bottom: $spacing-md;
 }
 
+// ===== 我的语录专属卡片 =====
+.userQuoteSection {
+  margin-bottom: $spacing-md;
+}
+
+.userQuoteCard {
+  background: linear-gradient(135deg, #fff7f0 0%, #ffeede 100%);
+  border: 1rpx solid #ffd9b3;
+  border-radius: $radius-xl;
+  padding: 28rpx 32rpx;
+  box-shadow: $shadow-card;
+}
+
+.userQuoteHead {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.userQuoteTag {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: #e8651a;
+}
+
+.userQuoteCat {
+  margin-left: 16rpx;
+  font-size: $font-size-xs;
+  color: #b5651d;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: $radius-round;
+  padding: 4rpx 16rpx;
+}
+
+.userQuoteContent {
+  display: block;
+  font-size: $font-size-md;
+  line-height: $line-height-loose;
+  color: $color-text-primary;
+}
+
+.userQuoteCopy {
+  margin-top: 20rpx;
+  display: inline-flex;
+  background: #e8651a;
+  border-radius: $radius-round;
+  padding: 10rpx 28rpx;
+
+  &:active {
+    opacity: 0.8;
+  }
+}
+
+.userQuoteCopyText {
+  font-size: $font-size-sm;
+  color: #ffffff;
+}
+
 .responseItem {
   margin-bottom: $spacing-md;
 }

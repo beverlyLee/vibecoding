@@ -174,22 +174,3 @@
   color: $color-text-disabled;
   line-height: $line-height-loose;
 }
-
-// 未登录时 hero 下方的快速登录按钮
-.quickLoginBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: $spacing-lg;
-  height: 72rpx;
-  border-radius: $radius-md;
-  background: $color-gradient-primary;
-  color: $color-on-primary;
-  font-size: $font-size-md;
-  font-weight: $font-weight-medium;
-  box-shadow: 0 4rpx 14rpx rgba($color-primary, 0.3);
-
-  &:active {
-    opacity: 0.85;
-  }
-}

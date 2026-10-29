@@ -217,6 +217,28 @@ export default function DefendPage() {
             <View className={styles.intentCard}>
               <IntentCard result={result} />
             </View>
+
+            {/* 我的语录专属卡片：命中时并行展示，未命中不渲染 */}
+            {result.userQuote && (
+              <View className={styles.userQuoteSection}>
+                <View className={styles.userQuoteCard}>
+                  <View className={styles.userQuoteHead}>
+                    <Text className={styles.userQuoteTag}>✨ 我的语录</Text>
+                    {result.userQuote.category ? (
+                      <Text className={styles.userQuoteCat}>{result.userQuote.category}</Text>
+                    ) : null}
+                  </View>
+                  <Text className={styles.userQuoteContent}>{result.userQuote.content}</Text>
+                  <View
+                    className={styles.userQuoteCopy}
+                    onClick={() => handleCopy(result.userQuote!.content)}
+                  >
+                    <Text className={styles.userQuoteCopyText}>复制这条</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
             {result.responses.map((r) => (
               <View key={r.id} className={styles.responseItem}>
                 <ResponseCard

@@ -458,6 +458,8 @@ export function removeFixedQuote(id: string): boolean {
 
 let _userQuotesCache: Quote[] | null = null;
 let _userQuotesPromise: Promise<void> | null = null;
+// 缓存建立时的登录态：用于识别"未登录时空缓存"，登录后强制重拉
+let _userQuotesCacheAtLogin = false;
 
 /**
  * 加载当前登录用户的自建语录到内存缓存
@@ -467,8 +469,14 @@ let _userQuotesPromise: Promise<void> | null = null;
 export function initUserQuotes(force = false): Promise<void> {
   // 强制刷新时走一次
   if (!force && _userQuotesCache) {
-    logger.debug('[initUserQuotes] ✅ 命中内存缓存', _userQuotesCache.length, '条');
-    return Promise.resolve();
+    // 之前未登录时缓存了空数组，但现在已登录 → 缓存已失效，需要重新拉取
+    if (_userQuotesCache.length === 0 && !_userQuotesCacheAtLogin && authStore.isLoggedIn()) {
+      logger.debug('[initUserQuotes] 未登录时空缓存，现已登录，重新拉取');
+      // fall through 重拉
+    } else {
+      logger.debug('[initUserQuotes] ✅ 命中内存缓存', _userQuotesCache.length, '条');
+      return Promise.resolve();
+    }
   }
 
   // 如果 auth 还在初始化，等它一下再决定（避免 race condition 导致提前缓存空数组）
@@ -498,6 +506,7 @@ export function initUserQuotes(force = false): Promise<void> {
     if (!loggedIn) {
       logger.warn('[initUserQuotes] ⚠️ 未登录，跳过加载');
       _userQuotesCache = [];
+      _userQuotesCacheAtLogin = false;
       return;
     }
 
@@ -513,6 +522,7 @@ export function initUserQuotes(force = false): Promise<void> {
           logger.debug('[initUserQuotes] 📡 开始拉 user_quotes.list ...');
           const list = await userQuotesList();
           _userQuotesCache = list || [];
+          _userQuotesCacheAtLogin = true;
           logger.debug('[initUserQuotes] ✅ 拉到', _userQuotesCache.length, '条');
         } else {
           logger.warn('[initUserQuotes] ⚠️ 环境不是 weapp 或 Taro.cloud 不存在，用空');
@@ -521,6 +531,7 @@ export function initUserQuotes(force = false): Promise<void> {
       } catch (err: any) {
         logger.error('[initUserQuotes] ❌ userQuotesList 失败:', err?.code, err?.message, err);
         _userQuotesCache = [];
+        _userQuotesCacheAtLogin = false;
       } finally {
         _userQuotesPromise = null;
       }
@@ -538,6 +549,7 @@ export function getAllUserQuotes(): Quote[] {
 /** 新增/更新/删除后调用，让后续读取拿到最新数据 */
 export function invalidateUserQuotes(): void {
   _userQuotesCache = null;
+  _userQuotesCacheAtLogin = false;
   // 下次 initUserQuotes 会重新拉
 }
 

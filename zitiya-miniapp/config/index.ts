@@ -16,7 +16,15 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
       828: 1.81 / 2,
     },
     sourceRoot: 'src',
-    outputRoot: process.env.TARO_OUTPUT_DIR || 'dist',
+    // 小程序与 H5 产物分目录，避免互相覆盖（weapp→dist/weapp，h5→dist/h5）
+    // 仍可被 TARO_OUTPUT_DIR 环境变量覆盖
+    outputRoot:
+      process.env.TARO_OUTPUT_DIR ||
+      (() => {
+        const i = process.argv.indexOf('--type');
+        const t = i >= 0 ? process.argv[i + 1] : '';
+        return t ? `dist/${t}` : 'dist';
+      })(),
     plugins: ['@tarojs/plugin-html'],
     defineConstants: {
       // 构建期注入后端地址：API_BASE=https://your-fastapi.example.com taro build --type h5

@@ -7,9 +7,10 @@ import type { IntentRule } from '@/data/intents';
 import { chatCompletion, extractJSON } from '@/services/llm';
 import { useAppStore } from '@/store/useAppStore';
 import { funnelForEngine } from '@/services/quoteFunnel';
-import { getKeywordsFor, getAllIntentRules, getPrompt, getModelParams, initCloudConfig } from '@/services/sceneConfig';
+import { getKeywordsFor, getAllIntentRules, getPrompt, getModelParams, initCloudConfig, initUserQuotes, getAllUserQuotes } from '@/services/sceneConfig';
 import { filterResponses } from '@/services/contentFilter';
 import { matchInDailyPool, hasDailyPool } from '@/services/dailyIntentPool';
+import type { Quote } from '@/data/quotes';
 import { logger } from '@/utils/logger';
 
 const VALID_STYLES: ResponseStyle[] = ['gentle', 'humor', 'direct', 'counter'];
@@ -162,6 +163,32 @@ function pickPrimaryRuleFromFixed(ranked: IntentCandidate[]): IntentRule {
   return getAllIntentRules().find((r) => r.key === GENERIC_INTENT_KEY)!;
 }
 
+// 我的语录作为 L1 独立候选：每条语录按各自 keywords 打分，命中即视为该语录场景。
+// 权重 1.5（高于多数固定意图），让"自己的话术"在命中时优先于通用模板。
+function rankUserQuoteIntents(text: string): IntentCandidate[] {
+  const userQuotes = getAllUserQuotes();
+  if (!userQuotes.length) return [];
+  const ranked: IntentCandidate[] = [];
+  for (const q of userQuotes) {
+    const keywords = q.keywords && q.keywords.length ? q.keywords : [];
+    if (!keywords.length) continue;
+    const hits = countHits(text, keywords);
+    if (hits > 0) {
+      ranked.push({
+        name: q.category || '我的语录',
+        intentKey: `user:${q.id}`,
+        score: 1.5 * hits,
+        hits,
+      });
+    }
+  }
+  return ranked;
+}
+
+function getUserQuoteById(id: string): Quote | undefined {
+  return getAllUserQuotes().find((q) => q.id === id);
+}
+
 // 规则引擎分析：零网络依赖，即时返回（rule 由调用方先匹配好传入）
 function ruleAnalyze(
   utterance: string,
@@ -193,12 +220,13 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
   if (!text) throw new Error('输入为空');
   // 确保云端场景配置（意图集/语录集）已加载，避免冷启动竞态导致不同设备结果不一致
   await initCloudConfig();
+  // 先确保用户语录已加载（未登录降级空数组，不阻塞）
+  await initUserQuotes();
   const startTime = Date.now();
 
   const cfg = useAppStore.getState().getActiveLLM();
 
-  // ========== 意图判定：严格漏斗递进（L1 零命中才进 L2，L2 零命中才进 L3）==========
-  // 评分只在同一层内部排序用
+  // ========== 意图判定 L1：固定规则 ==========
   const fixedRanked = rankFixedIntents(text);
   const hasFixedHit = fixedRanked.length > 0;
   const fixedRule = hasFixedHit
@@ -309,13 +337,14 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
   if (funnelHit?.quotes?.length) {
     const existingTexts = new Set(baseResult.responses.map((r) => r.text));
     const extras = funnelHit.quotes
+      .filter((q) => q.source !== 'user')            // 我的语录改由专属卡片展示，不重复塞进回话
       .filter((q) => !existingTexts.has(q.content))   // 去重
       .slice(0, 2)                                   // 最多加 2 条推荐金句
       .map((q, i) => ({
         id: `${Date.now()}_funnel_${i}`,
         style: 'gentle' as ResponseStyle,
         text: q.content,
-        reason: q.source === 'user' ? '✨ 我的语录 · 推荐金句' : `${funnelSourceTag} · 推荐金句`,
+        reason: `${funnelSourceTag} · 推荐金句`,
       }));
     baseResult.responses = [...baseResult.responses, ...extras];
   }
@@ -327,9 +356,23 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
   }
   baseResult.responses = safe;
 
+  // ========== 我的语录：独立检索，命中则在拆招页并行展示专属卡片 ==========
+  // 不抢占主回话：正常意图判定流水线照常跑，这里额外查一遍「我的语录」库；
+  // 命中即随机挑一条作为专属卡片（多条命中随机显示一条），未命中则不展示。
+  let matchedUserQuote: Quote | null = null;
+  const userQuoteHits = rankUserQuoteIntents(text);
+  if (userQuoteHits.length > 0) {
+    const pick = userQuoteHits[Math.floor(Math.random() * userQuoteHits.length)];
+    matchedUserQuote = getUserQuoteById(pick.intentKey.slice('user:'.length)) || null;
+    logger.debug(`[Engine] 我的语录命中 ${userQuoteHits.length} 条, 随机展示「${matchedUserQuote?.category || ''}」`);
+  } else {
+    logger.debug('[Engine] 我的语录无命中 → 不展示卡片');
+  }
+
   return {
     ...baseResult,
     source: funnelSourceTag ? `rule_with_funnel_${funnelHit?.hitLayer}` as any : source,
+    userQuote: matchedUserQuote,
     id: `result_${Date.now()}`,
     utterance: text,
     costMs: Date.now() - startTime,

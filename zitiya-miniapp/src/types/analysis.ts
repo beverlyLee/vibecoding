@@ -1,5 +1,7 @@
 // 分析相关类型定义
 
+import type { Quote } from '@/data/quotes';
+
 // 回应风格
 export type ResponseStyle = 'gentle' | 'humor' | 'direct' | 'counter';
 
@@ -28,6 +30,8 @@ export interface AnalysisResult {
   // 结果来源：rule 规则模板秒回 / llm 大模型返回 / fallback LLM调失败降级 / fallback_no_llm 规则无命中且未配置 LLM
   source: 'rule' | 'llm' | 'fallback' | 'fallback_no_llm';
   responses: Response[];
+  // 命中的「我的语录」专属卡片：引擎独立检索用户语录库，多条命中时随机挑一条；未命中为 null/undefined（不展示卡片）
+  userQuote?: Quote | null;
   // 分析耗时（毫秒）
   costMs: number;
 }
