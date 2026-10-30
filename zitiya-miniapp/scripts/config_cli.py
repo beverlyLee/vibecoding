@@ -50,10 +50,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 GENERIC_KEY = "generic"
 
-# 默认爬虫话题（和前端 sceneConfig.DEFAULT_CRAWL_TOPICS 保持一致）
+# 默认爬虫话题（和前端 sceneConfig.DEFAULT_CRAWL_TOPICS 保持一致，短关键词式）
 DEFAULT_CRAWL_TOPICS = [
-    '接话技巧', '高情商说话', '回话的技术', '怎么拒绝', '拒绝别人',
-    '说话的艺术', '沟通技巧', '不尴尬拒绝', '怼人技巧', '怎么回怼', '嘴替'
+    '拒绝', '情商', '沟通', '回怼', '嘴替', '社交', '相亲', '职场',
+    '催婚', '借钱', '婆媳', '内卷', '人际关系', '高情商', '说话', '怼'
 ]
 
 # 默认 LLM prompts（和前端 sceneConfig.DEFAULT_PROMPTS 保持一致，精简摘要便于 CLI 展示）

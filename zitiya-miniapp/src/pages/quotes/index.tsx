@@ -15,7 +15,7 @@ import { useLoginSheet } from '@/hooks/useLoginSheet';
 import logoDuck from '@/assets/logo.png';
 import styles from './index.module.scss';
 
-type Tab = 'all' | 'mine';
+type Tab = 'all' | 'daily' | 'mine';
 
 const FREE_LIMIT = 3; // 未登录时全部 tab 免费看前 3 条
 
@@ -57,7 +57,9 @@ export default function QuotesPage() {
   // 客户端过滤：分类 + tab + 搜索词（全字段匹配）
   const filteredQuotes = useMemo(() => {
     let list = allQuotes;
-    if (tab === 'mine') {
+    if (tab === 'daily') {
+      list = list.filter((q) => q.source === 'daily');
+    } else if (tab === 'mine') {
       list = list.filter((q) => q.source === 'user');
     }
     if (category !== '全部') {
@@ -80,7 +82,7 @@ export default function QuotesPage() {
     ? filteredQuotes
     : filteredQuotes.slice(0, FREE_LIMIT);
   const hiddenCount = filteredQuotes.length - visibleQuotes.length;
-  const locked = tab === 'all' && !loggedIn && hiddenCount > 0;
+  const locked = (tab === 'all' || tab === 'daily') && !loggedIn && hiddenCount > 0;
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -94,6 +96,7 @@ export default function QuotesPage() {
       setRefreshing(false);
     }
   };
+
 
   const handleUse = (quote: Quote) => {
     setPendingQuote(quote.content);
@@ -161,13 +164,19 @@ export default function QuotesPage() {
         </View>
       </View>
 
-      {/* Tab 切换：全部 / 我的 */}
+      {/* Tab 切换：全部 / 每日语录库 / 我的 */}
       <View className={styles.tabBar}>
         <Text
           className={[styles.tabItem, tab === 'all' && styles.tabItemActive].join(' ')}
           onClick={() => handleTabChange('all')}
         >
           全部语录
+        </Text>
+        <Text
+          className={[styles.tabItem, tab === 'daily' && styles.tabItemActive].join(' ')}
+          onClick={() => handleTabChange('daily')}
+        >
+          每日语录库
         </Text>
         <Text
           className={[styles.tabItem, tab === 'mine' && styles.tabItemActive].join(' ')}
@@ -191,9 +200,9 @@ export default function QuotesPage() {
         )}
         <View
           className={[styles.refreshBtn, refreshing && styles.refreshBtnActive].filter(Boolean).join(' ')}
-          onClick={tab === 'all' ? handleRefresh : undefined}
+          onClick={tab !== 'mine' ? handleRefresh : undefined}
         >
-          <Text>{tab === 'all' ? (refreshing ? '刷新中…' : '🔄 刷新热话') : '🔍'}</Text>
+          <Text>{tab === 'mine' ? '🔍' : (refreshing ? '刷新中…' : '🔄 刷新热话')}</Text>
         </View>
       </View>
 
@@ -213,7 +222,7 @@ export default function QuotesPage() {
       </View>
 
       <Text className={styles.countTip}>
-        共 {filteredQuotes.length} 条 {tab === 'mine' ? '我的语录' : '语录'}
+        共 {filteredQuotes.length} 条 {tab === 'mine' ? '我的语录' : tab === 'daily' ? '每日语录' : '语录'}
         {locked && ` · 免费看前 ${FREE_LIMIT} 条`}
       </Text>
 

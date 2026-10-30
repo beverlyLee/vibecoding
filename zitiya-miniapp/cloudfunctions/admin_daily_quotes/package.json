@@ -1,0 +1,10 @@
+{
+  "name": "admin_daily_quotes",
+  "version": "1.0.0",
+  "private": true,
+  "description": "每日语录库管理：列表筛选 / 按天统计 / 删除，读写 daily_quotes 集合",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

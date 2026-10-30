@@ -448,3 +448,67 @@
   border-radius: $radius-sm;
   font-size: $font-size-sm;
 }
+
+// —— 固定语录管理：统计条 ——
+.statBar {
+  display: flex;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-sm;
+}
+.statItem {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  background: $color-bg-hover;
+  padding: 8rpx 20rpx;
+  border-radius: $radius-round;
+}
+
+// —— 每日语录管理：统计柱状 + 筛选行 ——
+.statChart {
+  display: flex;
+  flex-direction: row;
+  white-space: nowrap;
+  margin-top: $spacing-sm;
+}
+.statCol {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  width: 64rpx;
+  margin-right: 8rpx;
+}
+.statBarWrap {
+  width: 28rpx;
+  height: 160rpx;
+  background: $color-bg-hover;
+  border-radius: $radius-xs;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+.statBarFill {
+  width: 100%;
+  background: $color-primary;
+  border-radius: $radius-xs;
+  min-height: 2rpx;
+}
+.statColNum {
+  font-size: $font-size-xs;
+  color: $color-text-secondary;
+  margin-top: 4rpx;
+}
+.statColDate {
+  font-size: 18rpx;
+  color: $color-text-tertiary;
+  margin-top: 2rpx;
+}
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  margin-top: $spacing-sm;
+}
+.searchRow .inlineInput {
+  flex: 1;
+  min-width: 0;
+}

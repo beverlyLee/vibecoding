@@ -18,19 +18,11 @@ import { authStore, getAuthState } from '@/store/useUserStore';
 
 const CONFIG_KEY = 'zuitiya_scene_config';
 
-// 默认爬虫话题（微博）—— 云函数 daily_crawler 没配自定义话题时用这个
+// 默认爬虫话题（短关键词式）—— 云函数 daily_crawler / social_tips_crawler 没配自定义话题时用这个。
+// 用短关键词而非短语，因为免费热榜以新闻娱乐为主，短词更易命中热榜标题。
 export const DEFAULT_CRAWL_TOPICS: string[] = [
-  '接话技巧',
-  '高情商说话',
-  '回话的技术',
-  '怎么拒绝',
-  '拒绝别人',
-  '说话的艺术',
-  '沟通技巧',
-  '不尴尬拒绝',
-  '怼人技巧',
-  '怎么回怼',
-  '嘴替'
+  '拒绝', '情商', '沟通', '回怼', '嘴替', '社交', '相亲', '职场',
+  '催婚', '借钱', '婆媳', '内卷', '人际关系', '高情商', '说话', '怼'
 ];
 
 // 云端 scene_config 集合 _id='main' 的结构

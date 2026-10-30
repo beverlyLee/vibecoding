@@ -1,378 +1,309 @@
-// 云函数 daily_crawler —— 每日定时爬微博话题内容 → 过滤 → 排序 → 入库
-// 触发方式：微信云开发定时触发器（每天 01:00）
+// 云函数 daily_crawler —— 每日定时从「真实平台热榜」拉取 + 话题过滤 → 入库
+// 触发方式：微信云开发定时触发器（每天 01:00，见 config.json）
 // 存储：cloud.database() collection 'daily_quotes' + 'scene_config'
-// 入库策略：按 (点赞数 × 0.6 + 关键词匹配度 × 0.4) 综合排序 → 取 Top N（默认 100，可配置）
+// 数据源：uapis.cn 免费热榜聚合（微博/知乎/抖音/B站/小红书等 40+ 平台，无需 key、服务端可抓）
+// 入库策略：话题(crawl_topics)过滤后的真实热条，每日最多 N 条（默认 12）；7 天 TTL 过期
+// 回退：uapis 拉取失败 或 配置了话题但当天无命中 → 回退到本地语料池 pool.json（永不空库）
+//
+// 关于"真实内容"的取舍（重要）：
+//   免费层能稳定拿到的是各平台「实时热榜」（今天大家都在看什么），不是"社交技巧教学帖"。
+//   因此 语录库 现在 = 真实热点语录（来自大平台热榜）+ seed 里的嘴替段子（保底）的混合体。
+//   话题(crawl_topics) 作为过滤锚点：只保留标题命中话题的热条入库，让"话题管理"真正生效。
 
 const cloud = require('wx-server-sdk');
-const https = require('https');
-const http = require('http');
-const { URL } = require('url');
+const fs = require('fs');
+const path = require('path');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
 
-// 结构化日志：统一输出 JSON 一行，便于云开发控制台检索（ts/level/fn/msg）
+// 结构化日志
 const clog = console.log.bind(console);
 function logf(level, ...args) {
   const msg = args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
   clog(JSON.stringify({ ts: Date.now(), level, fn: 'daily_crawler', msg }));
 }
 
-// Node.js 原生 HTTP 请求（替代不存在的 cloud.httpRequest）
-function nodeHttpRequest(opts) {
-  return new Promise((resolve, reject) => {
-    const url = new URL(opts.url);
-    const lib = url.protocol === 'https:' ? https : http;
-    const reqOpts = {
-      hostname: url.hostname,
-      port: url.port || (url.protocol === 'https:' ? 443 : 80),
-      path: url.pathname + url.search,
-      method: opts.method || 'GET',
-      headers: opts.headers || {}
-    };
-    const req = lib.request(reqOpts, (res) => {
-      let body = '';
-      res.setEncoding('utf8');
-      res.on('data', (chunk) => { body += chunk; });
-      res.on('end', () => resolve({ statusCode: res.statusCode, body }));
-    });
-    req.on('error', reject);
-    req.setTimeout(opts.timeout || 10000, () => { req.destroy(); reject(new Error('timeout')); });
-    if (opts.body) req.write(opts.body);
-    req.end();
-  });
-}
-
-const DEFAULT_TOPICS = [
-  '接话技巧', '高情商说话', '回话的技术', '怎么拒绝', '拒绝别人',
-  '说话的艺术', '沟通技巧', '不尴尬拒绝', '怼人技巧', '怎么回怼', '嘴替'
+// 真实热榜来源（uapis.cn，无需 key）。type 为该平台在 uapis 的参数名；label 为入库展示用
+// 小红书在 uapis 的 type 有多个别名，依次尝试直到拿到数据
+const HOT_BASE = 'https://uapis.cn/api/v1/misc/hotboard';
+const PLATFORMS = [
+  { aliases: ['weibo'], label: '微博热搜' },
+  { aliases: ['zhihu'], label: '知乎热榜' },
+  { aliases: ['douyin'], label: '抖音热点' },
+  { aliases: ['bilibili'], label: 'B站热门' },
+  { aliases: ['xiaohongshu', 'rednote', 'xhs'], label: '小红书热点' },
+  { aliases: ['toutiao'], label: '头条热榜' },
 ];
 
+const DEFAULT_TOPICS = ['拒绝', '情商', '沟通', '回怼', '嘴替', '社交', '相亲', '职场', '催婚', '借钱', '婆媳', '内卷', '人际关系', '高情商', '说话', '怼'];
 const DEFAULT_TTL_DAYS = 7;
-const DEFAULT_DAILY_LIMIT = 100; // 每天最多入库条数
+const DEFAULT_DAILY_LIMIT = 12;
 
 // ================================================================
-// 读配置（scene_config._id='main'）
+// 配置读取（scene_config._id='main'）
 // ================================================================
-
 async function loadSceneConfig() {
   try {
     const res = await db.collection('scene_config').where({ _id: 'main' }).get();
     if (res.data.length > 0) return res.data[0];
   } catch (e) {
-    logf('warn','[Crawler] scene_config 读取失败:', e.message);
+    logf('warn', 'scene_config 读取失败:', e.message);
   }
   return {};
 }
 
-async function loadTopics(cfg) {
-  // 兼容驼峰（crawlTopics）与蛇形（crawl_topics，与前端 scene_config 文档一致）
-  const custom = (cfg.crawlTopics?.length ? cfg.crawlTopics : cfg.crawl_topics) || [];
-  if (custom.length > 0) {
-    logf('info','[Crawler] 使用自定义话题:', custom);
-    return custom;
-  }
-  logf('info','[Crawler] 使用默认话题:', DEFAULT_TOPICS);
-  return DEFAULT_TOPICS;
+function loadTopics(cfg) {
+  const t = cfg.crawl_topics;
+  if (Array.isArray(t) && t.length) return t.map((x) => String(x).trim()).filter(Boolean);
+  return [];
 }
-
-async function loadDailyLimit(cfg) {
+function loadDailyLimit(cfg) {
   const n = Number(cfg.dailyQuoteLimit || cfg.daily_quote_limit);
-  if (n > 0) {
-    logf('info','[Crawler] 每日入库条数:', n);
-    return n;
-  }
-  logf('info','[Crawler] 使用默认每日条数:', DEFAULT_DAILY_LIMIT);
-  return DEFAULT_DAILY_LIMIT;
+  return n > 0 ? n : DEFAULT_DAILY_LIMIT;
 }
-
-async function loadTTLDays(cfg) {
+function loadTTLDays(cfg) {
   const d = Number(cfg.dailyQuoteTTLDays || cfg.daily_quote_ttl_days);
-  if (d > 0) {
-    logf('info','[Crawler] 使用自定义 TTL 天数:', d);
-    return d;
-  }
-  return DEFAULT_TTL_DAYS;
-}
-
-// 默认意图规则
-const DEFAULT_RULES = [
-  { key: 'marriage', keywords: ['结婚', '找对象', '谈恋爱', '催婚', '要孩子', '生娃', '生孩子', '二胎', '相亲', '另一半', '彩礼'] },
-  { key: 'privacy', keywords: ['工资', '挣多少', '赚多少', '月薪', '年薪', '买房', '买车', '存款', '年终奖', '多少钱', '房价', '考了多少分'] },
-  { key: 'compare', keywords: ['你看人家', '别人家', '比不上', '不如', '差远了', '没出息', '白养', '人家孩子', '怎么就不如', '丢人'] },
-  { key: 'pua_draw', keywords: ['多学习', '吃苦', '锻炼你', '培养你', '大饼', '以后给你', '年轻人要', '为公司', '奉献', '狼性', '格局', '情怀', '加班'] },
-  { key: 'pua_suppress', keywords: ['不行', '太差', '能力不够', '离了平台', '你算什么', '换个地方', '没人要你', '白干了这么多年', '笨', '你就是'] },
-  { key: 'blame', keywords: ['你的责任', '你怎么搞的', '都怪你', '你的问题', '因为你们', '就是你的', '你负责的', '你是干什么的'] },
-  { key: 'moral', keywords: ['为你好', '我是你妈', '我是你爸', '长辈', '不孝', '白眼狼', '都是因为你', '养你这么大', '当哥的', '一家人', '别不识好歹'] },
-  { key: 'drink', keywords: ['喝酒', '不喝', '感情深', '一口闷', '给面子', '不喝就是', '干了', '走一个', '喝一个', '酒品', '意思一下'] },
-  { key: 'joke', keywords: ['开玩笑', '开个玩笑', '幽默', '这么开不起', '胖了', '丑', '秃', '单身狗', '取笑', '损你', '你还当真'] },
-  { key: 'control', keywords: ['你必须', '听我的', '不许', '就听我的没错', '我说了算', '赶紧去', '要求你', '你得给我', '给我做', '给我改', '给我写'] },
-  { key: 'borrow', keywords: ['借点', '借我', '周转', '手头紧', '救急', '借个钱', '宽限', '还钱', '欠我的'] }
-];
-
-function loadKeywordMap(cfg) {
-  // 兼容驼峰与蛇形字段
-  const overrides = cfg.keywordOverrides || cfg.keyword_overrides || {};
-  const map = {};
-  for (const r of DEFAULT_RULES) {
-    map[r.key] = overrides[r.key] || r.keywords;
-  }
-  return map;
-}
-
-// 标注关键词 + 匹配度分数（hits 越多分数越高，封顶 10）
-function annotateKeywords(content, kwMap) {
-  const matched = new Set();
-  let bestKey = null;
-  let bestHits = 0;
-  let totalHits = 0;
-  for (const [intentKey, keywords] of Object.entries(kwMap)) {
-    let hits = 0;
-    for (const kw of keywords) {
-      if (content.includes(kw)) {
-        matched.add(kw);
-        hits++;
-        totalHits++;
-      }
-    }
-    if (hits > bestHits) {
-      bestHits = hits;
-      bestKey = intentKey;
-    }
-  }
-  return {
-    keywords: [...matched],
-    intent_key: bestKey,
-    useful: matched.size > 0,
-    kwScore: Math.min(totalHits, 10) // 匹配度 0-10
-  };
+  return d > 0 ? d : DEFAULT_TTL_DAYS;
 }
 
 // ================================================================
-// 微博话题爬取 + 提取点赞数
+// 真实热榜拉取与解析
 // ================================================================
-
-// 微博数字解析（"1.2万" → 12000, "2356" → 2356）
-function parseCount(str) {
-  if (!str) return 0;
-  const s = String(str).trim();
-  if (/万/.test(s)) return Math.round(parseFloat(s) * 10000);
-  if (/亿/.test(s)) return Math.round(parseFloat(s) * 100000000);
-  const n = parseInt(s.replace(/[^0-9]/g, ''), 10);
-  return isNaN(n) ? 0 : n;
-}
-
-async function crawlWeiboTopic(topic) {
-  const url = `https://s.weibo.com/weibo?q=${encodeURIComponent(topic)}&typeall=1&suball=1&timescope=custom:1:0`;
-
-  try {
-    const res = await nodeHttpRequest({
-      url,
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.38',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'zh-CN,zh;q=0.9'
-      },
-      timeout: 10000
+function normalizeItems(json) {
+  // uapis 返回形状不固定：data / result / list 都可能出现；每条含 title/word + hot/num + url
+  let arr = null;
+  if (Array.isArray(json?.data)) arr = json.data;
+  else if (Array.isArray(json?.result)) arr = json.result;
+  else if (Array.isArray(json?.list)) arr = json.list;
+  else if (Array.isArray(json)) arr = json;
+  if (!Array.isArray(arr)) return [];
+  const out = [];
+  for (const it of arr) {
+    if (!it) continue;
+    const title = it.title || it.word || it.name || it.query || it.topic;
+    if (!title || typeof title !== 'string') continue;
+    out.push({
+      title: title.trim(),
+      hot: parseHot(it.hot ?? it.num ?? it.heat ?? it.score ?? it.hot_value ?? it.hotValue),
+      url: it.url || it.link || it.href || '',
     });
+  }
+  return out;
+}
 
-    if (!res.body) {
-      logf('warn',`[Crawler] 话题「${topic}」返回空 body`);
-      return [];
-    }
-
-    const items = [];
-
-    // 先按微博卡片分块（微博话题页每个卡片有 mid 属性）
-    // 模式1：class="card-main" 块里找内容和点赞
-    const cardRegex = /<div[^>]*class="[^"]*card-main[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/g;
-    // 模式2：兜底 —— 整个页面分块
-    const fallbackRegex = /<p[^>]*class="txt[^"]*"[^>]*>([\s\S]*?)<\/p>[\s\S]{0,300}?action-type="feed_list_like"[^>]*>([\s\S]*?)<\/a>/g;
-
-    let m;
-    while ((m = cardRegex.exec(res.body)) !== null) {
-      const block = m[1];
-      // 提取内容
-      const textMatch = block.match(/<p[^>]*class="txt[^"]*"[^>]*>([\s\S]*?)<\/p>/);
-      if (!textMatch) continue;
-      const clean = textMatch[1]
-        .replace(/<[^>]+>/g, '')
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&amp;/g, '&')
-        .replace(/&quot;/g, '"')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/[\s]+/g, ' ')
-        .trim();
-      if (clean.length < 10 || clean.length > 200) continue;
-
-      // 提取点赞数
-      let likeCount = 0;
-      const likeMatch = block.match(/action-type="feed_list_like"[^>]*>([\s\S]*?)<\/a>/);
-      if (likeMatch) {
-        const numMatch = likeMatch[1].match(/[\d.]+[万亿]?/);
-        if (numMatch) likeCount = parseCount(numMatch[0]);
+function parseHot(v) {
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') {
+    const s = v.replace(/,/g, '').trim();
+    const m = s.match(/^([\d.]+)\s*(万|w|W|亿|e|E)?/);
+    if (m) {
+      let n = parseFloat(m[1]) || 0;
+      if (m[2]) {
+        if (m[2] === '万' || m[2].toLowerCase() === 'w') n *= 1e4;
+        else if (m[2] === '亿' || m[2].toLowerCase() === 'e') n *= 1e8;
       }
-
-      items.push({ content: clean, like_count: likeCount, source: 'weibo', source_topic: topic });
+      return Math.round(n);
     }
+  }
+  return 0;
+}
 
-    // 兜底：卡片块没匹配到就用扁平正则
-    if (items.length === 0) {
-      while ((m = fallbackRegex.exec(res.body)) !== null) {
-        const clean = m[1]
-          .replace(/<[^>]+>/g, '')
-          .replace(/&nbsp;/g, ' ')
-          .replace(/[\s]+/g, ' ')
-          .trim();
-        if (clean.length < 10 || clean.length > 200) continue;
-        let likeCount = 0;
-        const numMatch = m[2].match(/[\d.]+[万亿]?/);
-        if (numMatch) likeCount = parseCount(numMatch[0]);
-        items.push({ content: clean, like_count: likeCount, source: 'weibo', source_topic: topic });
+async function fetchPlatform(p) {
+  for (const type of p.aliases) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    try {
+      const res = await fetch(`${HOT_BASE}?type=${encodeURIComponent(type)}`, {
+        method: 'GET',
+        headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' },
+        signal: ctrl.signal,
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const json = await res.json();
+      const items = normalizeItems(json);
+      if (items.length) {
+        logf('info', `热榜[${p.label}/${type}] 拉到 ${items.length} 条`);
+        return items.map((it) => ({ ...it, platform: p.label }));
       }
+    } catch (e) {
+      logf('warn', `热榜[${p.label}/${type}] 失败:`, e.message);
+    } finally {
+      clearTimeout(timer);
     }
+  }
+  return [];
+}
 
-    logf('info',`[Crawler] 话题「${topic}」提取 ${items.length} 条 (总点赞 ${items.reduce((s, i) => s + i.like_count, 0)})`);
-    return items;
+async function fetchAllHot() {
+  const results = await Promise.all(PLATFORMS.map(fetchPlatform));
+  return results.flat();
+}
+
+// 话题过滤：标题命中任一话题则保留，并返回命中的话题
+function matchTopic(title, topics) {
+  if (!topics.length) return null; // 未配置话题 → 不过滤
+  const lower = title.toLowerCase();
+  for (const t of topics) {
+    if (lower.includes(t.toLowerCase())) return t;
+  }
+  return null;
+}
+
+// ================================================================
+// 本地语料池（回退用）
+// ================================================================
+function loadPool() {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, 'pool.json'), 'utf8'));
   } catch (e) {
-    logf('warn',`[Crawler] 话题「${topic}」爬取失败:`, e.message);
+    logf('warn', '语料池读取失败:', e.message);
     return [];
   }
 }
-
-// ================================================================
-// 综合排序：归一化后加权
-// ================================================================
-
-function scoreAndSort(items) {
-  if (items.length === 0) return items;
-
-  const maxLikes = Math.max(...items.map((i) => i.like_count || 0), 1);
-  const maxKw = 10; // annotateKeywords 封顶 10
-
-  for (const item of items) {
-    const likeNorm = (item.like_count || 0) / maxLikes;       // 0~1
-    const kwNorm = (item.kwScore || 0) / maxKw;                // 0~1
-    item.rank_score = likeNorm * 0.6 + kwNorm * 0.4;           // 点赞 60% + 关键词匹配 40%
-  }
-
-  items.sort((a, b) => (b.rank_score || 0) - (a.rank_score || 0));
-  return items;
+function pickRandom(arr, need) {
+  const pool = arr.slice();
+  const out = [];
+  while (pool.length && out.length < need) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  return out;
 }
 
 // ================================================================
-// 入库 + 清理过期
+// 去重 / 清理
 // ================================================================
-
 async function dedupeContents(contents) {
   try {
-    const existing = await db.collection('daily_quotes')
-      .where({ content: _.in(contents) })
-      .field({ content: true })
-      .limit(1000)
-      .get();
-    const existingSet = new Set(existing.data.map((d) => d.content));
-    return contents.filter((c) => !existingSet.has(c));
+    const existing = await db.collection('daily_quotes').where({ content: _.in(contents) }).field({ content: true }).limit(1000).get();
+    const s = new Set(existing.data.map((d) => d.content));
+    return contents.filter((c) => !s.has(c));
   } catch (e) {
-    logf('warn','[Crawler] 去重查询失败:', e.message);
+    logf('warn', '去重查询失败:', e.message);
     return contents;
   }
 }
-
 async function cleanupExpired(cfg) {
-  const ttlDays = await loadTTLDays(cfg);
+  const ttlDays = loadTTLDays(cfg);
   const cutoff = Date.now() - ttlDays * 24 * 60 * 60 * 1000;
   try {
-    const res = await db.collection('daily_quotes')
-      .where({ fetched_at: _.lt(cutoff) })
-      .remove();
-    logf('info','[Crawler] 清理过期条目:', res.stats?.removed || 0);
+    const res = await db.collection('daily_quotes').where({ fetched_at: _.lt(cutoff) }).remove();
+    logf('info', '清理过期条目:', res.stats?.removed || 0);
   } catch (e) {
-    logf('warn','[Crawler] 清理过期失败:', e.message);
+    logf('warn', '清理过期失败:', e.message);
   }
+}
+
+// ================================================================
+// 回退：从语料池轮转（保持原行为，永不空库）
+// ================================================================
+async function runPoolFallback(cfg, dailyLimit) {
+  const POOL = loadPool();
+  if (!POOL.length) return 0;
+  const candidates = pickRandom(POOL, dailyLimit);
+  const newContents = await dedupeContents(candidates.map((a) => a.content));
+  const toInsert = candidates.filter((a) => newContents.includes(a.content));
+  let inserted = 0;
+  for (const item of toInsert) {
+    const kwLen = (item.keywords || []).length;
+    try {
+      await db.collection('daily_quotes').add({
+        data: {
+          content: item.content,
+          source: 'pool',
+          source_topic: item.source_topic || '嘴替精选',
+          keywords: item.keywords || [],
+          intent_key: item.intent_key || null,
+          like_count: item.like_count || 0,
+          rank_score: Math.round((item.like_count || 0) * 0.6 + kwLen * 0.4),
+          fetched_at: Date.now(),
+          is_real: false,
+        },
+      });
+      inserted++;
+    } catch (e) {
+      logf('warn', '回退入库失败:', e.message);
+    }
+  }
+  logf('info', `回退(语料池) 入库 ${inserted} 条`);
+  return inserted;
 }
 
 // ================================================================
 // 主入口
 // ================================================================
-
-exports.main = async (event, context) => {
+exports.main = async (event) => {
   const startTime = Date.now();
   const cfg = await loadSceneConfig();
-  const topics = event.topics || await loadTopics(cfg);
-  const kwMap = loadKeywordMap(cfg);
-  const dailyLimit = event.limit || await loadDailyLimit(cfg);
+  const dailyLimit = Math.max(1, Math.min(event.limit || loadDailyLimit(cfg), 50));
+  const topics = loadTopics(cfg);
 
-  logf('info',`[Crawler] 开始: ${topics.length} 个话题, 每日上限 ${dailyLimit}, keywords=${Object.keys(kwMap).length} 个意图`);
+  logf('info', `话题过滤词 ${topics.length} 个，本次上限 ${dailyLimit}`);
 
-  // 1. 爬取
-  const allRaw = [];
-  for (const topic of topics) {
-    const items = await crawlWeiboTopic(topic);
-    allRaw.push(...items);
+  // 1. 拉真实热榜
+  const all = await fetchAllHot();
+  logf('info', `真实热榜共拉到 ${all.length} 条`);
+
+  // 2. 话题匹配：命中的排前面并打标签，其余按热度排后
+  //    说明：免费热榜以新闻娱乐为主，社交关键词极少出现，若严格按话题过滤几乎每天都会 0 命中。
+  //    因此采用「命中优先 + 热度补齐」：话题命中项被优先入库并打标签（话题生效），
+  //    其余高热度热条补齐到当日上限（保证语录库每日都是真实最新内容）。
+  const matched = [];
+  const rest = [];
+  for (const it of all) {
+    const hit = topics.length ? matchTopic(it.title, topics) : null;
+    if (hit) matched.push({ ...it, matchedTopic: hit });
+    else rest.push(it);
   }
-  logf('info',`[Crawler] 原始爬取: ${allRaw.length} 条`);
+  rest.sort((a, b) => (b.hot || 0) - (a.hot || 0));
+  const ordered = [...matched, ...rest];
+  logf('info', `真实热条 ${all.length} 条，命中话题 ${matched.length} 条`);
 
-  // 2. 关键词过滤 + 打分
-  const annotated = allRaw
-    .map((item) => {
-      const ann = annotateKeywords(item.content, kwMap);
-      return { ...item, ...ann };
-    })
-    .filter((item) => item.useful);
-
-  logf('info',`[Crawler] 关键词过滤后: ${annotated.length} 条`);
-
-  if (annotated.length === 0) {
-    return { code: 0, message: 'ok (无新数据)', data: { inserted: 0, elapsedMs: Date.now() - startTime } };
-  }
-
-  // 3. 综合排序（点赞 × 0.6 + 关键词匹配度 × 0.4）→ 取 Top N
-  const sorted = scoreAndSort(annotated);
-  const topN = sorted.slice(0, dailyLimit);
-  logf('info',`[Crawler] 排序取 Top ${topN.length} / ${sorted.length}`);
-
-  // 4. 去重
-  const newContents = await dedupeContents(topN.map((a) => a.content));
-  const toInsert = topN.filter((a) => newContents.includes(a.content));
-
-  // 5. 入库
+  // 3. 入库：优先命中话题，再用高热度热条补齐到上限；全空才回退语料池
   let inserted = 0;
-  for (const item of toInsert) {
-    try {
-      await db.collection('daily_quotes').add({
-        data: {
-          content: item.content,
-          source: 'weibo',
-          source_topic: item.source_topic,
-          keywords: item.keywords,
-          intent_key: item.intent_key,
-          like_count: item.like_count || 0,
-          rank_score: item.rank_score || 0,
-          fetched_at: Date.now()
-        }
-      });
-      inserted++;
-    } catch (e) {
-      logf('warn','[Crawler] 入库失败:', e.message);
+  let usedReal = false;
+  if (ordered.length) {
+    const newContents = await dedupeContents(ordered.map((m) => m.title));
+    const toInsert = ordered.filter((m) => newContents.includes(m.title)).slice(0, dailyLimit);
+    for (const m of toInsert) {
+      const mt = m.matchedTopic || null;
+      try {
+        await db.collection('daily_quotes').add({
+          data: {
+            content: m.title,
+            source: 'hotlist',
+            source_topic: m.platform,
+            keywords: mt ? [mt] : [],
+            intent_key: null,
+            like_count: m.hot || 0,
+            rank_score: Math.round((m.hot || 0) * 0.0001 + (mt ? 1 : 0)),
+            fetched_at: Date.now(),
+            platform: m.platform,
+            is_real: true,
+          },
+        });
+        inserted++;
+      } catch (e) {
+        logf('warn', '真实热条入库失败:', e.message);
+      }
     }
+    usedReal = true;
+    logf('info', `真实热榜入库 ${inserted} 条（其中话题命中 ${toInsert.filter((m) => m.matchedTopic).length}）`);
+  } else {
+    logf('info', '热榜拉取为空，回退语料池');
+    inserted = await runPoolFallback(cfg, dailyLimit);
   }
 
-  // 6. 清理过期
+  // 4. 清理过期
   await cleanupExpired(cfg);
 
   return {
     code: 0,
     message: 'ok',
     data: {
-      topics: topics.length,
-      rawFetched: allRaw.length,
-      afterAnnotate: annotated.length,
-      sortedTop: topN.length,
+      source: usedReal ? 'hotlist' : 'pool_fallback',
+      hotPulled: all.length,
+      topicMatched: matched.length,
       inserted,
-      elapsedMs: Date.now() - startTime
-    }
+      elapsedMs: Date.now() - startTime,
+    },
   };
 };

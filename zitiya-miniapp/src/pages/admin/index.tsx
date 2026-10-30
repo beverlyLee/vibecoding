@@ -12,19 +12,21 @@ import {
   ModelParamsManagement,
   PresetManagement,
   PromptManagement,
-  QuoteManagement,
+  FixedQuoteManagement,
   TopicManagement,
+  DailyQuoteManagement,
 } from './ConfigSections';
 import styles from './index.module.scss';
 
 type TabKey =
-  | 'users' | 'intents' | 'quotes' | 'topics' | 'model'
+  | 'users' | 'intents' | 'fixed' | 'dailyQuotes' | 'topics' | 'model'
   | 'daily' | 'apibase' | 'attack' | 'attackcat' | 'presets' | 'prompts';
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'users', label: '用户管理' },
   { key: 'intents', label: '意图管理' },
-  { key: 'quotes', label: '语录管理' },
+  { key: 'fixed', label: '固定语录管理' },
+  { key: 'dailyQuotes', label: '每日语录管理' },
   { key: 'topics', label: '话题管理' },
   { key: 'model', label: '模型参数' },
   { key: 'daily', label: '每日参数' },
@@ -67,8 +69,9 @@ export default function AdminPage() {
     switch (tab) {
       case 'users': return <UserManagement isAdmin={isAdmin} />;
       case 'intents': return <IntentManagement isAdmin={isAdmin} />;
-      case 'quotes': return <QuoteManagement isAdmin={isAdmin} />;
-      case 'topics': return <TopicManagement isAdmin={isAdmin} />;
+    case 'fixed': return <FixedQuoteManagement isAdmin={isAdmin} />;
+    case 'dailyQuotes': return <DailyQuoteManagement isAdmin={isAdmin} />;
+    case 'topics': return <TopicManagement isAdmin={isAdmin} />;
       case 'model': return <ModelParamsManagement isAdmin={isAdmin} />;
       case 'daily': return <DailyManagement isAdmin={isAdmin} />;
       case 'apibase': return <ApiBaseManagement isAdmin={isAdmin} />;

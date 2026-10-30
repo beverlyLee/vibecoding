@@ -2,8 +2,8 @@
 // 全部从 admin_config 云函数读取「全局配置」(scene_config.main)，保存即对所有用户生效。
 // operator 角色可查看，admin 角色可修改（保存按钮仅在 isAdmin 时渲染）。
 
-import { useEffect, useState } from 'react';
-import { View, Text, Input, Textarea, Button, Picker } from '@tarojs/components';
+import { useEffect, useState, useMemo } from 'react';
+import { View, Text, Input, Textarea, Button, Picker, ScrollView } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import {
   adminGetConfig,
@@ -19,6 +19,14 @@ import {
   adminSaveQuotes,
   adminSaveTopics,
 } from '@/services/adminConfig';
+import {
+  adminListDailyQuotes,
+  adminDailyStats,
+  adminRemoveDailyQuote,
+  DAILY_SOURCE_LABEL,
+  type DailyQuoteRow,
+  type DailyQuoteStatsResp,
+} from '@/services/adminDailyQuotes';
 import type {
   AttackScene,
   CloudSceneConfig,
@@ -249,10 +257,21 @@ function IntentManagement({ isAdmin }: { isAdmin: boolean }) {
 // ================================================================
 // 语录管理
 // ================================================================
-function QuoteManagement({ isAdmin }: { isAdmin: boolean }) {
+function FixedQuoteManagement({ isAdmin }: { isAdmin: boolean }) {
   const { value, setValue, loading, saving, setSaving } = useConfig((c) => c.fixed_quotes, QUOTES as Quote[]);
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('催婚反击');
+  // 分类筛选
+  const [filterCat, setFilterCat] = useState('全部');
+  const allCategories = useMemo(() => {
+    const s = new Set<string>(['全部']);
+    (value || []).forEach((q) => q.category && s.add(q.category));
+    return Array.from(s);
+  }, [value]);
+  const filtered = useMemo(() => {
+    if (filterCat === '全部') return value;
+    return (value || []).filter((q) => q.category === filterCat);
+  }, [value, filterCat]);
 
   function removeQuote(id: string) {
     setValue(value.filter((q) => q.id !== id));
@@ -289,7 +308,18 @@ function QuoteManagement({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <View>
-      <SectionHeader title='语录管理' desc='固定语录库（Layer 1），机器人优先从这里取金句。' />
+      <SectionHeader title='固定语录管理' desc='固定语录库（Layer 1），机器人优先从这里取金句。支持新增/删除，保存即全局生效。' />
+      <View className={styles.statBar}>
+        <Text className={styles.statItem}>共 {value.length} 条</Text>
+        <Text className={styles.statItem}>当前「{filterCat}」{filtered.length} 条</Text>
+      </View>
+      <View className={styles.card}>
+        <Text className={styles.fieldLabel}>按分类筛选</Text>
+        <Picker mode='selector' range={allCategories} value={Math.max(0, allCategories.indexOf(filterCat))}
+          onChange={(e) => setFilterCat(allCategories[Number(e.detail.value)])}>
+          <View className={styles.pickerBox}><Text>{filterCat}</Text></View>
+        </Picker>
+      </View>
       <View className={styles.card}>
         <Text className={styles.fieldLabel}>新增语录内容</Text>
         <Textarea className={styles.textarea} value={content} onInput={(e) => setContent(e.detail.value)} />
@@ -297,7 +327,7 @@ function QuoteManagement({ isAdmin }: { isAdmin: boolean }) {
         <Input className={styles.inlineInput} value={category} onInput={(e) => setCategory(e.detail.value)} />
         <Button size='mini' className={styles.addBtn} onClick={addQuote}>添加</Button>
       </View>
-      {value.map((q) => (
+      {filtered.map((q) => (
         <View key={q.id} className={styles.card}>
           <View className={styles.cardHead}>
             <Text className={styles.quoteText}>{q.content}</Text>
@@ -343,9 +373,9 @@ function TopicManagement({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <View>
-      <SectionHeader title='话题管理' desc='云函数 daily_crawler 按这些话题抓取微博语录，留空则用代码默认。' />
+      <SectionHeader title='话题管理' desc='每日定时任务(daily_crawler / social_tips_crawler)据此从真实平台热榜(微博/知乎/抖音/B站/小红书)过滤拉取语录与小技巧。留空则不过滤、拉全量热榜。' />
       <View className={styles.card}>
-        <Textarea className={styles.textarea} value={topic} placeholder='输入一个话题后点添加'
+        <Textarea className={styles.textarea} value={topic} placeholder='输入一个短关键词后点添加（如：拒绝、情商、社交）'
           onInput={(e) => setTopic(e.detail.value)} />
         <Button size='mini' className={styles.addBtn} onClick={addTopic}>添加</Button>
       </View>
@@ -419,7 +449,7 @@ function ModelParamsManagement({ isAdmin }: { isAdmin: boolean }) {
 // 每日参数
 // ================================================================
 function DailyManagement({ isAdmin }: { isAdmin: boolean }) {
-  const limitHook = useConfig<number>((c) => c.daily_quote_limit, 100);
+  const limitHook = useConfig<number>((c) => c.daily_quote_limit, 12);
   const ttlHook = useConfig<number>((c) => c.daily_quote_ttl_days, DEFAULT_DAILY_TTL_DAYS);
   const [saving, setSaving] = useState(false);
 
@@ -442,9 +472,9 @@ function DailyManagement({ isAdmin }: { isAdmin: boolean }) {
 
   return (
     <View>
-      <SectionHeader title='每日参数' desc='控制云函数 daily_crawler 每天入库上限与语录缓存过期天数。' />
+      <SectionHeader title='每日参数' desc='控制云函数 daily_crawler 每天从语料池入库上限（默认 12）与语录缓存过期天数。' />
       <View className={styles.card}>
-        <Text className={styles.fieldLabel}>每日入库上限（条，默认 100）</Text>
+        <Text className={styles.fieldLabel}>每日入库上限（条，默认 12）</Text>
         <Input className={styles.inlineInput} type='digit' value={String(limitHook.value)}
           onInput={(e) => limitHook.setValue(Number(e.detail.value) || 0)} />
         <Text className={styles.fieldLabel}>语录缓存 TTL（天，默认 7，1~30）</Text>
@@ -728,9 +758,190 @@ function PromptManagement({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
+// ================================================================
+// 每日语录管理
+// ================================================================
+function fmtDay(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+function fmtTime(ts: number): string {
+  const d = new Date(ts);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+const DAILY_SOURCE_KEYS = Object.keys(DAILY_SOURCE_LABEL);
+const DAILY_PLATFORMS = ['all', '微博热搜', '知乎热榜', '抖音热点', 'B站热门', '小红书热点', '头条热榜'];
+
+function DailyQuoteManagement({ isAdmin }: { isAdmin: boolean }) {
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState<DailyQuoteStatsResp | null>(null);
+  const [list, setList] = useState<DailyQuoteRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+
+  // 筛选条件
+  const [rangePreset, setRangePreset] = useState('7');
+  const [source, setSource] = useState('all');
+  const [platform, setPlatform] = useState('all');
+  const [keyword, setKeyword] = useState('');
+
+  const statMax = stats ? Math.max(1, ...stats.daily.map((d) => d.count)) : 1;
+
+  async function loadStats() {
+    try {
+      const s = await adminDailyStats(Number(rangePreset));
+      setStats(s);
+    } catch (e: any) {
+      Taro.showToast({ title: e?.message || '统计失败', icon: 'none' });
+    }
+  }
+
+  async function loadList(reset: boolean) {
+    setLoading(true);
+    try {
+      const p = reset ? 1 : page;
+      const end = new Date();
+      const start = new Date(Date.now() - (Number(rangePreset) - 1) * 86400000);
+      const resp = await adminListDailyQuotes({
+        startDay: fmtDay(start),
+        endDay: fmtDay(end),
+        source,
+        platform,
+        keyword,
+        page: p,
+        pageSize: 30,
+      });
+      setTotal(resp.total);
+      if (reset) setList(resp.list);
+      else setList((prev) => [...prev, ...resp.list]);
+      setPage(p + 1);
+      setHasMore(resp.list.length >= 30 && resp.list.length < resp.total);
+    } catch (e: any) {
+      Taro.showToast({ title: e?.message || '加载失败', icon: 'none' });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadStats();
+    loadList(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function applyFilter() {
+    setList([]);
+    loadStats();
+    loadList(true);
+  }
+
+  async function handleRemove(id?: string) {
+    if (!id || !isAdmin) return;
+    const ok = await new Promise<boolean>((res) => {
+      Taro.showModal({
+        title: '删除这条每日语录？',
+        content: '删除后不再出现在语录库',
+        success: (r) => res(!!r.confirm),
+        fail: () => res(false),
+      });
+    });
+    if (!ok) return;
+    try {
+      await adminRemoveDailyQuote(id);
+      Taro.showToast({ title: '已删除', icon: 'success' });
+      applyFilter();
+    } catch (e: any) {
+      Taro.showToast({ title: e?.message || '删除失败', icon: 'none' });
+    }
+  }
+
+  if (loading && list.length === 0) return <Text className={styles.emptyTip}>加载中…</Text>;
+
+  return (
+    <View>
+      <SectionHeader title='每日语录管理' desc='由 daily_crawler 每天定时从真实平台热榜抓取入库。可筛选 / 统计 / 删除。' />
+
+      {/* 统计：最近 N 天每日入库数量 */}
+      <View className={styles.card}>
+        <Text className={styles.cardTitle}>每日入库数量（最近 {stats?.days ?? rangePreset} 天）</Text>
+        <ScrollView scrollX className={styles.statChart} showScrollbar={false}>
+          {(stats?.daily || []).map((d) => (
+            <View key={d.date} className={styles.statCol}>
+              <View className={styles.statBarWrap}>
+                <View className={styles.statBarFill} style={{ height: `${(d.count / statMax) * 100}%` }} />
+              </View>
+              <Text className={styles.statColNum}>{d.count || ''}</Text>
+              <Text className={styles.statColDate}>{d.date.slice(5)}</Text>
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* 筛选区 */}
+      <View className={styles.card}>
+        <Text className={styles.fieldLabel}>时间范围</Text>
+        <View className={styles.chipRow}>
+          {['7', '14', '30'].map((d) => (
+            <Text key={d} className={[styles.chip, rangePreset === d && styles.chipActive].filter(Boolean).join(' ')}
+              onClick={() => { setRangePreset(d); }}>{d} 天</Text>
+          ))}
+        </View>
+        <Text className={styles.fieldLabel}>来源</Text>
+        <View className={styles.chipRow}>
+          {DAILY_SOURCE_KEYS.map((k) => (
+            <Text key={k} className={[styles.chip, source === k && styles.chipActive].filter(Boolean).join(' ')}
+              onClick={() => { setSource(k); }}>{DAILY_SOURCE_LABEL[k]}</Text>
+          ))}
+        </View>
+        <Text className={styles.fieldLabel}>平台</Text>
+        <View className={styles.chipRow}>
+          {DAILY_PLATFORMS.map((p) => (
+            <Text key={p} className={[styles.chip, platform === p && styles.chipActive].filter(Boolean).join(' ')}
+              onClick={() => { setPlatform(p); }}>{p === 'all' ? '全部平台' : p}</Text>
+          ))}
+        </View>
+        <Text className={styles.fieldLabel}>关键词（匹配内容，点筛选生效）</Text>
+        <View className={styles.searchRow}>
+          <Input className={styles.inlineInput} value={keyword} placeholder='输入关键词'
+            onInput={(e) => setKeyword(e.detail.value)} />
+          <Button size='mini' className={styles.addBtn} onClick={applyFilter}>筛选</Button>
+        </View>
+      </View>
+
+      <Text className={styles.countTip}>共 {total} 条，当前显示 {list.length} 条</Text>
+
+      {list.map((q) => (
+        <View key={q._id} className={styles.card}>
+          <View className={styles.cardHead}>
+            <Text className={styles.quoteText}>{q.content}</Text>
+            {isAdmin && (
+              <Button size='mini' className={styles.delMini} onClick={() => handleRemove(q._id)}>删除</Button>
+            )}
+          </View>
+          <Text className={styles.metaTip}>
+            {DAILY_SOURCE_LABEL[q.source] || q.source}
+            {q.platform ? ' · ' + q.platform : ''}
+            {q.fetched_at ? ' · ' + fmtTime(q.fetched_at) : ''}
+            {typeof q.like_count === 'number' ? ' · 热度 ' + q.like_count : ''}
+          </Text>
+        </View>
+      ))}
+
+      {hasMore && (
+        <Button size='mini' className={styles.addBtn} loading={loading} onClick={() => loadList(false)}>加载更多</Button>
+      )}
+      {!hasMore && list.length > 0 && <Text className={styles.emptyTip}>已经到底啦</Text>}
+      {!loading && list.length === 0 && <Text className={styles.emptyTip}>没有符合条件的每日语录</Text>}
+    </View>
+  );
+}
+
 export {
   IntentManagement,
-  QuoteManagement,
+  FixedQuoteManagement,
   TopicManagement,
   ModelParamsManagement,
   DailyManagement,
@@ -739,4 +950,5 @@ export {
   AttackCategoryManagement,
   PresetManagement,
   PromptManagement,
+  DailyQuoteManagement,
 };

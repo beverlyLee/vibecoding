@@ -20,6 +20,7 @@ COPY main.py main.py
 COPY database.py database.py
 COPY config_store.py config_store.py
 COPY crawler.py crawler.py
+COPY daily_pool.json daily_pool.json
 COPY scheduler.py scheduler.py
 COPY routers routers
 

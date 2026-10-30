@@ -27,7 +27,7 @@ exports.main = async (event, context) => {
       id: `q_daily_${d._id}`,
       content: d.content,
       category: '社区热话',
-      note: `来自微博话题「${d.source_topic || '未知'}」`,
+      note: (d.source === 'hotlist' ? `来自${d.source_topic || '平台热榜'}` : (d.source === 'weibo' ? `来自微博话题「${d.source_topic || '未知'}」` : `嘴替精选 · ${d.source_topic || '每日语录'}`)),
       source: 'daily',
       author: '',
       url: d.url || '',
