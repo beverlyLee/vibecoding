@@ -50,6 +50,8 @@ export interface DailyQuoteListResp {
 export interface DailyQuoteStatItem {
   date: string;
   count: number;
+  /** 截至该天的累计总数（窗口前存量 + 窗口内累计新增） */
+  total?: number;
 }
 
 export interface DailyQuoteStatsResp {

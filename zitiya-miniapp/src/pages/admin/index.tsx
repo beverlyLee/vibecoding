@@ -12,29 +12,34 @@ import {
   ModelParamsManagement,
   PresetManagement,
   PromptManagement,
-  FixedQuoteManagement,
+  QuoteLibraryManagement,
   TopicManagement,
-  DailyQuoteManagement,
 } from './ConfigSections';
 import styles from './index.module.scss';
 
 type TabKey =
-  | 'users' | 'intents' | 'fixed' | 'dailyQuotes' | 'topics' | 'model'
+  | 'quotes' | 'users' | 'intents' | 'topics' | 'model'
   | 'daily' | 'apibase' | 'attack' | 'attackcat' | 'presets' | 'prompts';
 
-const TABS: Array<{ key: TabKey; label: string }> = [
-  { key: 'users', label: '用户管理' },
-  { key: 'intents', label: '意图管理' },
-  { key: 'fixed', label: '固定语录管理' },
-  { key: 'dailyQuotes', label: '每日语录管理' },
-  { key: 'topics', label: '话题管理' },
-  { key: 'model', label: '模型参数' },
-  { key: 'daily', label: '每日参数' },
-  { key: 'apibase', label: '后端地址' },
-  { key: 'attack', label: '出招场景' },
-  { key: 'attackcat', label: '出招分类' },
-  { key: 'presets', label: 'LLM预设' },
-  { key: 'prompts', label: '提示词' },
+type TabItem =
+  | { kind: 'label'; label: string }
+  | { kind: 'divider' }
+  | { kind: 'tab'; key: TabKey; label: string };
+
+// 语录库管理：固定语录库 / 每日语录库 / 我的语录库 三库合一，内部再分 tab
+const TABS: TabItem[] = [
+  { kind: 'tab', key: 'quotes', label: '语录库管理' },
+  { kind: 'divider' },
+  { kind: 'tab', key: 'users', label: '用户管理' },
+  { kind: 'tab', key: 'intents', label: '意图管理' },
+  { kind: 'tab', key: 'topics', label: '话题管理' },
+  { kind: 'tab', key: 'model', label: '模型参数' },
+  { kind: 'tab', key: 'daily', label: '每日参数' },
+  { kind: 'tab', key: 'apibase', label: '后端地址' },
+  { kind: 'tab', key: 'attack', label: '出招场景' },
+  { kind: 'tab', key: 'attackcat', label: '出招分类' },
+  { kind: 'tab', key: 'presets', label: 'LLM预设' },
+  { kind: 'tab', key: 'prompts', label: '提示词' },
 ];
 
 export default function AdminPage() {
@@ -42,7 +47,7 @@ export default function AdminPage() {
   const isAdmin = user?.role === 'admin';
   const isStaff = isAdmin || user?.role === 'operator';
 
-  const [tab, setTab] = useState<TabKey>('users');
+  const [tab, setTab] = useState<TabKey>('quotes');
 
   useDidShow(() => {
     const r = role();
@@ -67,10 +72,9 @@ export default function AdminPage() {
 
   function renderTab() {
     switch (tab) {
+      case 'quotes': return <QuoteLibraryManagement isAdmin={isAdmin} />;
       case 'users': return <UserManagement isAdmin={isAdmin} />;
       case 'intents': return <IntentManagement isAdmin={isAdmin} />;
-    case 'fixed': return <FixedQuoteManagement isAdmin={isAdmin} />;
-    case 'dailyQuotes': return <DailyQuoteManagement isAdmin={isAdmin} />;
     case 'topics': return <TopicManagement isAdmin={isAdmin} />;
       case 'model': return <ModelParamsManagement isAdmin={isAdmin} />;
       case 'daily': return <DailyManagement isAdmin={isAdmin} />;
@@ -79,20 +83,32 @@ export default function AdminPage() {
       case 'attackcat': return <AttackCategoryManagement isAdmin={isAdmin} />;
       case 'presets': return <PresetManagement isAdmin={isAdmin} />;
       case 'prompts': return <PromptManagement isAdmin={isAdmin} />;
-      default: return <UserManagement isAdmin={isAdmin} />;
+      default: return <QuoteLibraryManagement isAdmin={isAdmin} />;
     }
   }
 
   return (
     <View className={styles.page}>
       <ScrollView scrollX className={styles.tabBar} showScrollbar={false}>
-        {TABS.map((t) => (
-          <Text
-            key={t.key}
-            className={[styles.tab, tab === t.key && styles.tabActive].filter(Boolean).join(' ')}
-            onClick={() => setTab(t.key)}
-          >{t.label}</Text>
-        ))}
+        {TABS.map((t, i) => {
+          if (t.kind === 'label') {
+            return (
+              <Text key={`lbl_${i}`} className={styles.tabGroup}>{t.label}</Text>
+            );
+          }
+          if (t.kind === 'divider') {
+            return (
+              <Text key={`div_${i}`} className={styles.tabDivider}>│</Text>
+            );
+          }
+          return (
+            <Text
+              key={t.key}
+              className={[styles.tab, tab === t.key && styles.tabActive].filter(Boolean).join(' ')}
+              onClick={() => setTab(t.key)}
+            >{t.label}</Text>
+          );
+        })}
       </ScrollView>
       <View className={styles.tabContent}>
         {renderTab()}

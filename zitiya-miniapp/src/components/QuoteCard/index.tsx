@@ -28,9 +28,11 @@ export default function QuoteCard({ quote, onUse, onEdit, onDelete }: QuoteCardP
     <View className={styles.card}>
       <View className={styles.topRow}>
         <Text className={styles.category}>{quote.category}</Text>
-        <Text className={[styles.sourceBadge, styles[`source_${source}`]].join(' ')}>
-          {sourceLabels[source]}
-        </Text>
+        {isUserQuote && (
+          <Text className={[styles.sourceBadge, styles[`source_${source}`]].join(' ')}>
+            {sourceLabels[source]}
+          </Text>
+        )}
       </View>
       <Text className={styles.content}>“{quote.content}”</Text>
 

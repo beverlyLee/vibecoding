@@ -1,0 +1,10 @@
+{
+  "name": "admin_user_quotes",
+  "version": "1.0.0",
+  "private": true,
+  "description": "我的语录库管理（跨用户视角）：列表筛选 / 按用户统计 / 删除，读写 user_quotes 集合",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

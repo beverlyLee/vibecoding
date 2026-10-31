@@ -27,6 +27,14 @@ import {
   type DailyQuoteRow,
   type DailyQuoteStatsResp,
 } from '@/services/adminDailyQuotes';
+import {
+  adminListUserQuotes,
+  adminUserQuoteStats,
+  adminRemoveUserQuote,
+  type UserQuoteRow,
+  type UserQuoteStatsResp,
+  type UserQuoteStatItem,
+} from '@/services/adminUserQuotes';
 import type {
   AttackScene,
   CloudSceneConfig,
@@ -864,12 +872,17 @@ function DailyQuoteManagement({ isAdmin }: { isAdmin: boolean }) {
     <View>
       <SectionHeader title='每日语录管理' desc='由 daily_crawler 每天定时从真实平台热榜抓取入库。可筛选 / 统计 / 删除。' />
 
-      {/* 统计：最近 N 天每日入库数量 */}
+      {/* 统计：最近 N 天每日入库数量 + 累计总数 */}
       <View className={styles.card}>
-        <Text className={styles.cardTitle}>每日入库数量（最近 {stats?.days ?? rangePreset} 天）</Text>
+        <View className={styles.cardHead}>
+          <Text className={styles.cardTitle}>每日入库数量（最近 {stats?.days ?? rangePreset} 天）</Text>
+          <Text className={styles.headlineTotal}>总数量 {stats?.total ?? 0}</Text>
+        </View>
+        <Text className={styles.chartLegend}>柱高=当日新增 · 顶部数字=截至当日累计总数</Text>
         <ScrollView scrollX className={styles.statChart} showScrollbar={false}>
           {(stats?.daily || []).map((d) => (
             <View key={d.date} className={styles.statCol}>
+              <Text className={styles.statColTotal}>{d.total}</Text>
               <View className={styles.statBarWrap}>
                 <View className={styles.statBarFill} style={{ height: `${(d.count / statMax) * 100}%` }} />
               </View>
@@ -939,9 +952,224 @@ function DailyQuoteManagement({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
+// ================================================================
+// 我的语录库管理（跨用户视角）
+// ================================================================
+function UserQuoteManagement({ isAdmin }: { isAdmin: boolean }) {
+  const [loading, setLoading] = useState(false);
+  const [stats, setStats] = useState<UserQuoteStatsResp | null>(null);
+  const [list, setList] = useState<UserQuoteRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+
+  // 筛选条件
+  const [rangePreset, setRangePreset] = useState('7');
+  const [userIdx, setUserIdx] = useState(0); // 0 = 全部用户
+  const [keyword, setKeyword] = useState('');
+
+  const userOpts = useMemo(() => ['全部用户', ...(stats?.users || []).map((u) => u.nickname)], [stats]);
+  const statMax = stats ? Math.max(1, ...stats.daily.map((d) => d.count)) : 1;
+
+  async function loadStats() {
+    try {
+      const s = await adminUserQuoteStats(Number(rangePreset));
+      setStats(s);
+    } catch (e: any) {
+      Taro.showToast({ title: e?.message || '统计失败', icon: 'none' });
+    }
+  }
+
+  async function loadList(reset: boolean) {
+    setLoading(true);
+    try {
+      const p = reset ? 1 : page;
+      const end = new Date();
+      const start = new Date(Date.now() - (Number(rangePreset) - 1) * 86400000);
+      const openid = userIdx > 0 ? (stats?.users?.[userIdx - 1]?.openid) : 'all';
+      const resp = await adminListUserQuotes({
+        openid,
+        startDay: fmtDay(start),
+        endDay: fmtDay(end),
+        keyword,
+        page: p,
+        pageSize: 30,
+      });
+      setTotal(resp.total);
+      if (reset) setList(resp.list);
+      else setList((prev) => [...prev, ...resp.list]);
+      setPage(p + 1);
+      setHasMore(resp.list.length >= 30 && resp.list.length < resp.total);
+    } catch (e: any) {
+      Taro.showToast({ title: e?.message || '加载失败', icon: 'none' });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadStats();
+    loadList(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function applyFilter() {
+    setList([]);
+    loadStats();
+    loadList(true);
+  }
+
+  async function handleRemove(id?: string) {
+    if (!id || !isAdmin) return;
+    const ok = await new Promise<boolean>((res) => {
+      Taro.showModal({
+        title: '删除这条我的语录？',
+        content: '删除后该用户将无法再看到此条',
+        success: (r) => res(!!r.confirm),
+        fail: () => res(false),
+      });
+    });
+    if (!ok) return;
+    try {
+      await adminRemoveUserQuote(id);
+      Taro.showToast({ title: '已删除', icon: 'success' });
+      applyFilter();
+    } catch (e: any) {
+      Taro.showToast({ title: e?.message || '删除失败', icon: 'none' });
+    }
+  }
+
+  if (loading && list.length === 0) return <Text className={styles.emptyTip}>加载中…</Text>;
+
+  return (
+    <View>
+      <SectionHeader title='我的语录库管理' desc='用户自己录入的语录（user_quotes），按用户维度汇总。可筛选 / 统计 / 删除。' />
+
+      {/* 统计：每用户录入条数排行 */}
+      <View className={styles.card}>
+        <Text className={styles.cardTitle}>各用户录入条数（共 {stats?.total ?? 0} 条）</Text>
+        <View className={styles.userStatList}>
+          {(stats?.users || []).slice(0, 12).map((u: UserQuoteStatItem, i: number) => (
+            <View key={u.openid} className={styles.userStatItem}>
+              <Text className={styles.userStatRank}>{i + 1}</Text>
+              <View className={styles.userStatMain}>
+                <Text className={styles.userStatName}>{u.nickname}</Text>
+                <Text className={styles.userStatMeta}>
+                  {u.count} 条{u.lastActive ? ' · 最近 ' + fmtTime(u.lastActive) : ''}
+                </Text>
+              </View>
+              <Text className={styles.userStatCount}>{u.count}</Text>
+            </View>
+          ))}
+          {(!stats?.users || stats.users.length === 0) && (
+            <Text className={styles.emptyTip}>还没有用户录入语录</Text>
+          )}
+        </View>
+      </View>
+
+      {/* 统计：最近 N 天每日新增趋势 + 累计总数 */}
+      <View className={styles.card}>
+        <View className={styles.cardHead}>
+          <Text className={styles.cardTitle}>每日新增（最近 {stats?.days ?? rangePreset} 天）</Text>
+          <Text className={styles.headlineTotal}>总数量 {stats?.total ?? 0}</Text>
+        </View>
+        <Text className={styles.chartLegend}>柱高=当日新增 · 顶部数字=截至当日累计总数</Text>
+        <ScrollView scrollX className={styles.statChart} showScrollbar={false}>
+          {(stats?.daily || []).map((d) => (
+            <View key={d.date} className={styles.statCol}>
+              <Text className={styles.statColTotal}>{d.total}</Text>
+              <View className={styles.statBarWrap}>
+                <View className={styles.statBarFill} style={{ height: `${(d.count / statMax) * 100}%` }} />
+              </View>
+              <Text className={styles.statColNum}>{d.count || ''}</Text>
+              <Text className={styles.statColDate}>{d.date.slice(5)}</Text>
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* 筛选区 */}
+      <View className={styles.card}>
+        <Text className={styles.fieldLabel}>时间范围</Text>
+        <View className={styles.chipRow}>
+          {['7', '14', '30'].map((d) => (
+            <Text key={d} className={[styles.chip, rangePreset === d && styles.chipActive].filter(Boolean).join(' ')}
+              onClick={() => { setRangePreset(d); }}>{d} 天</Text>
+          ))}
+        </View>
+        <Text className={styles.fieldLabel}>按用户筛选</Text>
+        <Picker mode='selector' range={userOpts} value={userIdx}
+          onChange={(e) => { setUserIdx(Number(e.detail.value)); }}>
+          <View className={styles.pickerBox}><Text>{userOpts[userIdx] || '全部用户'}</Text></View>
+        </Picker>
+        <Text className={styles.fieldLabel}>关键词（匹配内容，点筛选生效）</Text>
+        <View className={styles.searchRow}>
+          <Input className={styles.inlineInput} value={keyword} placeholder='输入关键词'
+            onInput={(e) => setKeyword(e.detail.value)} />
+          <Button size='mini' className={styles.addBtn} onClick={applyFilter}>筛选</Button>
+        </View>
+      </View>
+
+      <Text className={styles.countTip}>共 {total} 条，当前显示 {list.length} 条</Text>
+
+      {list.map((q) => (
+        <View key={q._id} className={styles.card}>
+          <View className={styles.cardHead}>
+            <Text className={styles.quoteText}>{q.content}</Text>
+            {isAdmin && (
+              <Button size='mini' className={styles.delMini} onClick={() => handleRemove(q._id)}>删除</Button>
+            )}
+          </View>
+          <Text className={styles.metaTip}>
+            {q.nickname || '未知用户'}
+            {q.category ? ' · ' + q.category : ''}
+            {q.createdAt ? ' · ' + fmtTime(q.createdAt) : ''}
+          </Text>
+        </View>
+      ))}
+
+      {hasMore && (
+        <Button size='mini' className={styles.addBtn} loading={loading} onClick={() => loadList(false)}>加载更多</Button>
+      )}
+      {!hasMore && list.length > 0 && <Text className={styles.emptyTip}>已经到底啦</Text>}
+      {!loading && list.length === 0 && <Text className={styles.emptyTip}>没有符合条件的语录</Text>}
+    </View>
+  );
+}
+
+// ================================================================
+// 语录库管理（固定 / 每日 / 我的 三库合一，内部 tab 切换）
+// ================================================================
+type QuoteLibTab = 'fixed' | 'daily' | 'mine';
+
+function QuoteLibraryManagement({ isAdmin }: { isAdmin: boolean }) {
+  const [libTab, setLibTab] = useState<QuoteLibTab>('fixed');
+  const LIB_TABS: { key: QuoteLibTab; label: string }[] = [
+    { key: 'fixed', label: '固定语录库' },
+    { key: 'daily', label: '每日语录库' },
+    { key: 'mine', label: '我的语录库' },
+  ];
+  return (
+    <View>
+      <ScrollView scrollX className={styles.tabBar} showScrollbar={false}>
+        {LIB_TABS.map((t) => (
+          <Text key={t.key}
+            className={[styles.tab, libTab === t.key && styles.tabActive].filter(Boolean).join(' ')}
+            onClick={() => setLibTab(t.key)}>{t.label}</Text>
+        ))}
+      </ScrollView>
+      <View>
+        {libTab === 'fixed' && <FixedQuoteManagement isAdmin={isAdmin} />}
+        {libTab === 'daily' && <DailyQuoteManagement isAdmin={isAdmin} />}
+        {libTab === 'mine' && <UserQuoteManagement isAdmin={isAdmin} />}
+      </View>
+    </View>
+  );
+}
+
 export {
   IntentManagement,
-  FixedQuoteManagement,
+  QuoteLibraryManagement,
   TopicManagement,
   ModelParamsManagement,
   DailyManagement,
@@ -950,5 +1178,4 @@ export {
   AttackCategoryManagement,
   PresetManagement,
   PromptManagement,
-  DailyQuoteManagement,
 };

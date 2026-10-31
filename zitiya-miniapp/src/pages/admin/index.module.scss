@@ -229,6 +229,14 @@
   font-size: $font-size-xs;
 }
 
+// 列表计数提示（每日语录 / 我的语录 数量统计）
+.countTip {
+  display: block;
+  font-size: $font-size-xs;
+  color: $color-text-secondary;
+  margin-bottom: $spacing-sm;
+}
+
 // 底部操作：load more
 .listFooter {
   padding: $spacing-md 0;
@@ -449,6 +457,66 @@
   font-size: $font-size-sm;
 }
 
+/* 分组标签（如「语录管理」）与分隔符 */
+.tabGroup {
+  flex: none;
+  padding: 12rpx 16rpx 12rpx 4rpx;
+  font-size: 24rpx;
+  font-weight: 700;
+  color: #8a8f99;
+  letter-spacing: 1rpx;
+  align-self: center;
+}
+.tabDivider {
+  flex: none;
+  padding: 0 8rpx;
+  color: #e0e3e8;
+  font-size: 28rpx;
+  align-self: center;
+}
+
+/* 我的语录库：每用户录入条数排行 */
+.userStatList {
+  margin-top: 8rpx;
+}
+.userStatItem {
+  display: flex;
+  align-items: center;
+  padding: 12rpx 0;
+  border-bottom: 1rpx solid #f0f1f3;
+}
+.userStatRank {
+  width: 40rpx;
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #b08d57;
+  text-align: center;
+}
+.userStatMain {
+  flex: 1;
+  min-width: 0;
+  padding: 0 12rpx;
+}
+.userStatName {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #1f2329;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.userStatMeta {
+  font-size: 22rpx;
+  color: #8a8f99;
+}
+.userStatCount {
+  width: 70rpx;
+  text-align: right;
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #0d9488;
+}
+
 // —— 固定语录管理：统计条 ——
 .statBar {
   display: flex;
@@ -501,6 +569,30 @@
   font-size: 18rpx;
   color: $color-text-tertiary;
   margin-top: 2rpx;
+}
+
+// 统计卡内：总量 headline + 图例 + 累计总数
+.headlineTotal {
+  margin-left: auto;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-bold;
+  color: #d4380d;
+}
+.chartLegend {
+  display: block;
+  font-size: 20rpx;
+  color: #8a8f99;
+  margin-bottom: 8rpx;
+}
+.statColTotal {
+  font-size: 20rpx;
+  font-weight: 600;
+  color: #0d9488;
+  margin-bottom: 4rpx;
+  max-width: 64rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .searchRow {
   display: flex;

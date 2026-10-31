@@ -83,7 +83,8 @@ async function actionList(event) {
 async function actionStats(event) {
   await requireRole('operator');
   const days = Math.min(Number(event && event.days) || 14, 60);
-  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const cutoff = now - days * 24 * 60 * 60 * 1000;
   const res = await db.collection(COLLECTION).where({ fetched_at: _.gte(cutoff) }).limit(1000).get();
   const buckets = {};
   for (const d of res.data) {
@@ -95,17 +96,26 @@ async function actionStats(event) {
       '-' + String(dt.getDate()).padStart(2, '0');
     buckets[key] = (buckets[key] || 0) + 1;
   }
-  // 补齐缺失日期，保证连续
+  // 窗口前存量（用于累计总数）
+  const baseRes = await db.collection(COLLECTION).where({ fetched_at: _.lt(cutoff) }).count();
+  const base = baseRes.total || 0;
+  // 全量总数（整库）
+  const allRes = await db.collection(COLLECTION).count();
+  const total = allRes.total || 0;
+  // 补齐缺失日期，保证连续，并算累计总数
   const arr = [];
+  let running = 0;
   for (let i = days - 1; i >= 0; i--) {
-    const dt = new Date(Date.now() - i * 86400000);
+    const dt = new Date(now - i * 86400000);
     const key =
       dt.getFullYear() +
       '-' + String(dt.getMonth() + 1).padStart(2, '0') +
       '-' + String(dt.getDate()).padStart(2, '0');
-    arr.push({ date: key, count: buckets[key] || 0 });
+    const c = buckets[key] || 0;
+    running += c;
+    arr.push({ date: key, count: c, total: base + running });
   }
-  return reply(0, 'ok', { days, total: res.data.length, daily: arr });
+  return reply(0, 'ok', { days, total, daily: arr });
 }
 
 // ================================================================
