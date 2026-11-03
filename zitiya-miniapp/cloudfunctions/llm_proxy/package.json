@@ -1,0 +1,10 @@
+{
+  "name": "llm_proxy",
+  "version": "1.0.0",
+  "private": true,
+  "description": "LLM 调用代理：转发 OpenAI/Anthropic 协议请求，规避小程序 request 合法域名白名单",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

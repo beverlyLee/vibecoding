@@ -73,6 +73,11 @@ function sanitizeQuote(input) {
     out.intent_key = input.intent_key.trim().slice(0, 50);
   }
 
+  // 是否由大模型生成（仅当显式传 true 才记录，用于"加入我的语录"时标记来源）
+  if (input.aiGenerated === true) {
+    out.aiGenerated = true;
+  }
+
   return out;
 }
 
@@ -88,6 +93,7 @@ function toQuote(row) {
     author: row.author || '',
     intent_key: row.intent_key || '',
     source: 'user',
+    aiGenerated: !!row.aiGenerated,
     fetched_at: row.createdAt ? new Date(row.createdAt).getTime() : 0,
   };
 }
@@ -141,7 +147,7 @@ async function actionUpdate(event) {
 
   // === 2. 规范化待更新字段 ===
   const sanitized = sanitizeQuote({ ...patchInput, content: patchInput.content || 'x' });
-  const allowed = ['content', 'category', 'note', 'keywords', 'author', 'intent_key'];
+  const allowed = ['content', 'category', 'note', 'keywords', 'author', 'intent_key', 'aiGenerated'];
   const updateData = {};
   for (const f of allowed) {
     if (f in sanitized && f !== 'openid') updateData[f] = sanitized[f];

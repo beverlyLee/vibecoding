@@ -43,9 +43,9 @@ export const LLM_PRESETS: LLMPreset[] = [
     name: '火山引擎（豆包）',
     protocol: 'openai',
     baseURL: 'https://ark.cn-beijing.volces.com/api/v3',
-    model: 'doubao-1-5-pro-32k',
+    model: 'doubao-1-5-pro-32k-250115',
     keyUrl: 'console.volcengine.com/ark',
-    note: '火山方舟，国内直连；模型名填接入点 ID（ep-开头）或模型名'
+    note: '火山方舟，国内直连。模型名填：①接入点ID（ep-开头，生产推荐，需在线推理创建）；②或带版本号模型名如 doubao-1-5-pro-32k-250115（公共接入点，需先在「开通管理」点开通服务）。'
   },
   {
     key: 'siliconflow',

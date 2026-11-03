@@ -158,6 +158,33 @@ interface LLMReply {
 
 // OpenAI 兼容协议（DeepSeek / 智谱 / 通义 / Kimi / OpenAI / 自定义）
 async function callOpenAI(cfg: LLMConfig, messages: ChatMessage[], opts: { temperature: number; maxTokens: number; timeout: number }): Promise<LLMReply> {
+  // 微信小程序端：走云函数代理，规避 request 合法域名白名单限制
+  if (process.env.TARO_ENV === 'weapp') {
+    logger.debug('[HTTP] llm.callOpenAI → 云函数代理 llm_proxy 模型:', cfg.model);
+    const httpStart = Date.now();
+    const res: any = await Taro.cloud.callFunction({
+      name: 'llm_proxy',
+      data: {
+        protocol: 'openai',
+        baseURL: cfg.baseURL,
+        apiKey: cfg.apiKey,
+        model: cfg.model,
+        messages,
+        temperature: opts.temperature,
+        maxTokens: opts.maxTokens,
+        timeout: opts.timeout
+      }
+    });
+    const result = res?.result;
+    if (!result || result.code !== 0) {
+      const errMsg = (result && result.message) || `代理调用失败（code ${result?.code}）`;
+      logger.error('[HTTP] llm.callOpenAI ✘ 代理', `${Date.now() - httpStart}ms`, errMsg);
+      throw new Error(errMsg);
+    }
+    logger.debug('[HTTP] llm.callOpenAI ✔ 代理', `${Date.now() - httpStart}ms`);
+    return { text: result.data.text, usage: result.data.usage };
+  }
+  // 非小程序（H5 等）：保留直连
   const url = `${cfg.baseURL.replace(/\/+$/, '')}/chat/completions`;
   logger.debug('[HTTP] llm.callOpenAI → POST', url, '模型:', cfg.model);
   const httpStart = Date.now();
@@ -197,6 +224,33 @@ async function callOpenAI(cfg: LLMConfig, messages: ChatMessage[], opts: { tempe
 
 // Anthropic 协议
 async function callAnthropic(cfg: LLMConfig, messages: ChatMessage[], opts: { temperature: number; maxTokens: number; timeout: number }): Promise<LLMReply> {
+  // 微信小程序端：走云函数代理
+  if (process.env.TARO_ENV === 'weapp') {
+    logger.debug('[HTTP] llm.callAnthropic → 云函数代理 llm_proxy 模型:', cfg.model);
+    const httpStart = Date.now();
+    const res: any = await Taro.cloud.callFunction({
+      name: 'llm_proxy',
+      data: {
+        protocol: 'anthropic',
+        baseURL: cfg.baseURL,
+        apiKey: cfg.apiKey,
+        model: cfg.model,
+        messages,
+        temperature: opts.temperature,
+        maxTokens: opts.maxTokens,
+        timeout: opts.timeout
+      }
+    });
+    const result = res?.result;
+    if (!result || result.code !== 0) {
+      const errMsg = (result && result.message) || `代理调用失败（code ${result?.code}）`;
+      logger.error('[HTTP] llm.callAnthropic ✘ 代理', `${Date.now() - httpStart}ms`, errMsg);
+      throw new Error(errMsg);
+    }
+    logger.debug('[HTTP] llm.callAnthropic ✔ 代理', `${Date.now() - httpStart}ms`);
+    return { text: result.data.text, usage: result.data.usage };
+  }
+  // 非小程序（H5 等）：保留直连
   const url = `${cfg.baseURL.replace(/\/+$/, '')}/v1/messages`;
   logger.debug('[HTTP] llm.callAnthropic → POST', url, '模型:', cfg.model);
   const httpStart = Date.now();

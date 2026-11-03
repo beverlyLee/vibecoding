@@ -30,6 +30,21 @@
   font-weight: $font-weight-medium;
 }
 
+.badgeGroup {
+  display: flex;
+  align-items: center;
+}
+
+.aiTag {
+  font-size: 18rpx;
+  padding: 4rpx 14rpx;
+  border-radius: $radius-xs;
+  margin-left: 12rpx;
+  font-weight: $font-weight-medium;
+  color: #7c3aed;
+  background: #ede9fe;
+}
+
 .source_fixed {
   color: #475569;
   background: #e2e8f0;

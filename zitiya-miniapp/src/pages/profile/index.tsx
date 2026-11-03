@@ -4,7 +4,6 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import { useUserStore } from '@/store/useUserStore';
 import { useLoginSheet } from '@/hooks/useLoginSheet';
 import logoDuck from '@/assets/logo.png';
-import SettingsPanel from '@/components/SettingsPanel';
 import styles from './index.module.scss';
 
 const ROLE_LABEL: Record<string, string> = {
@@ -150,18 +149,20 @@ export default function ProfilePage() {
         </View>
 
         {/* 菜单组 */}
-        <View className={styles.sectionTitle}>功能</View>
-        <View className={styles.menuCard}>
-          {isStaff && (
-            <View className={styles.menuItem} onClick={handleAdminEntry}>
-              <View className={`${styles.menuIcon} ${styles.menuIconAdmin}`}>🛠️</View>
-              <Text className={styles.menuLabel}>管理后台</Text>
-              {user?.role === 'admin' && <Text className={styles.menuValue}>全部权限</Text>}
-              {user?.role === 'operator' && <Text className={styles.menuValue}>配置与统计</Text>}
-              <Text className={styles.menuArrow}>›</Text>
+        {isStaff && (
+          <>
+            <View className={styles.sectionTitle}>功能</View>
+            <View className={styles.menuCard}>
+              <View className={styles.menuItem} onClick={handleAdminEntry}>
+                <View className={`${styles.menuIcon} ${styles.menuIconAdmin}`}>🛠️</View>
+                <Text className={styles.menuLabel}>管理后台</Text>
+                {user?.role === 'admin' && <Text className={styles.menuValue}>全部权限</Text>}
+                {user?.role === 'operator' && <Text className={styles.menuValue}>配置与统计</Text>}
+                <Text className={styles.menuArrow}>›</Text>
+              </View>
             </View>
-          )}
-        </View>
+          </>
+        )}
 
         <View className={styles.sectionTitle}>账户</View>
         <View className={styles.menuCard}>
@@ -179,8 +180,7 @@ export default function ProfilePage() {
           </View>
         </View>
 
-        <View className={styles.sectionTitle}>模型配置</View>
-        <SettingsPanel />
+        {/* 模型配置已交由运营在管理后台统一配置（全局默认），终端用户不再提供配置入口，故隐藏此区块 */}
       </View>
       {loginSheet}
     </>

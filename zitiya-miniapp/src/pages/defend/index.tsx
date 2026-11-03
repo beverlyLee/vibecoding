@@ -6,6 +6,8 @@ import IntentCard from '@/components/IntentCard';
 import ResponseCard from '@/components/ResponseCard';
 import EmptyState from '@/components/EmptyState';
 import { analyzeUtterance, rephraseResponse, copyText } from '@/services/engine';
+import { userQuotesAdd } from '@/services/userQuotes';
+import { getAllUserQuotes, invalidateUserQuotes, initUserQuotes } from '@/services/sceneConfig';
 import { useAppStore } from '@/store/useAppStore';
 import { useUserStore } from '@/store/useUserStore';
 import { useLoginSheet } from '@/hooks/useLoginSheet';
@@ -51,7 +53,8 @@ export default function DefendPage() {
   const [rephrasingId, setRephrasingId] = useState<string | null>(null);
   const activeLLM = useAppStore((s) => s.getActiveLLM());
   const clearPendingQuote = useAppStore((s) => s.clearPendingQuote);
-  const { requireLogin } = useUserStore();
+  const { status, user, requireLogin } = useUserStore();
+  const loggedIn = status === 'authenticated' && !!user;
   const loginSheet = useLoginSheet();
 
   // 页面曝光埋点
@@ -136,6 +139,40 @@ export default function DefendPage() {
       Taro.showToast({ title: '换个说法失败了', icon: 'none' });
     } finally {
       setRephrasingId(null);
+    }
+  };
+
+  // 把大模型/规则生成的回话加入「我的语录」
+  const handleAddToMine = async (text: string, fromAI: boolean) => {
+    if (!loggedIn) {
+      requireLogin('加入我的语录');
+      return;
+    }
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    // 确保用户语录缓存已加载，再去重，避免重复入库
+    await initUserQuotes();
+    const dup = getAllUserQuotes().find((q) => (q.content || '').trim() === trimmed);
+    if (dup) {
+      Taro.showToast({ title: '已经在你的语录里啦', icon: 'none' });
+      return;
+    }
+
+    try {
+      const note = fromAI
+        ? `AI 生成 · 原话：${(result?.utterance || '').slice(0, 80)}`
+        : '拆招回话';
+      await userQuotesAdd({
+        content: trimmed,
+        category: 'AI 定制',
+        note,
+        aiGenerated: fromAI,
+      });
+      invalidateUserQuotes(); // 刷新本地缓存，语录页「我的语录」立即可见
+      Taro.showToast({ title: '已加入我的语录 ✨', icon: 'success' });
+    } catch (err: any) {
+      Taro.showToast({ title: err?.message || '加入失败', icon: 'none' });
     }
   };
 
@@ -246,6 +283,8 @@ export default function DefendPage() {
                   rephrasing={rephrasingId === r.id}
                   onCopy={handleCopy}
                   onRephrase={handleRephrase}
+                  fromAI={result.source === 'llm'}
+                  onAddToMine={handleAddToMine}
                 />
               </View>
             ))}

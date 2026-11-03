@@ -15,6 +15,7 @@ export interface Quote {
   fetched_at?: number;           // 拉取时间戳
   intent_key?: string;           // 匹配到的意图 key
   score?: number;                // 匹配分数（漏斗查询时动态填入）
+  aiGenerated?: boolean;         // 是否由大模型生成的回话（加入我的语录时标记，便于"对应"来源）
 }
 
 export const QUOTE_CATEGORIES = [

@@ -39,6 +39,8 @@ export interface UserQuoteInput {
   keywords?: string[];
   author?: string;
   intent_key?: string;
+  /** 是否由大模型生成的回话（加入我的语录时标记来源） */
+  aiGenerated?: boolean;
 }
 
 export function userQuotesList(): Promise<Quote[]> {

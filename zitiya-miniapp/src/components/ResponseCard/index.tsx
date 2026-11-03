@@ -11,10 +11,14 @@ interface ResponseCardProps {
   rephrasing: boolean;
   onCopy: (text: string) => void;
   onRephrase: (response: Response) => void;
+  /** 该回话是否来自大模型生成（用于"加入我的语录"时标记来源） */
+  fromAI?: boolean;
+  /** 加入我的语录 */
+  onAddToMine?: (text: string, fromAI: boolean) => void;
 }
 
 // 单条回话卡片：风格标签 + 话术 + 解析 + 复制/换说法
-export default function ResponseCard({ response, rephrasing, onCopy, onRephrase }: ResponseCardProps) {
+export default function ResponseCard({ response, rephrasing, onCopy, onRephrase, fromAI, onAddToMine }: ResponseCardProps) {
   const meta = getStyleMeta(response.style);
   const [copied, setCopied] = useState(false);
 
@@ -59,6 +63,14 @@ export default function ResponseCard({ response, rephrasing, onCopy, onRephrase 
         >
           {rephrasing ? '换说法中…' : '🔄 换个说法'}
         </Button>
+        {onAddToMine && (
+          <Button
+            className={styles.actionBtn}
+            onClick={() => onAddToMine(response.text, fromAI || false)}
+          >
+            加入语录
+          </Button>
+        )}
       </View>
     </View>
   );
