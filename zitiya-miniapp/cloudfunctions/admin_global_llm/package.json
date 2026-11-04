@@ -1,0 +1,10 @@
+{
+  "name": "admin_global_llm",
+  "version": "1.0.0",
+  "private": true,
+  "description": "全局大模型配置管理：后台配置一个全局生效的模型（含 apiKey 服务端托管），所有用户无个人配置时复用",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

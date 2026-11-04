@@ -162,19 +162,19 @@ async function callOpenAI(cfg: LLMConfig, messages: ChatMessage[], opts: { tempe
   if (process.env.TARO_ENV === 'weapp') {
     logger.debug('[HTTP] llm.callOpenAI → 云函数代理 llm_proxy 模型:', cfg.model);
     const httpStart = Date.now();
-    const res: any = await Taro.cloud.callFunction({
-      name: 'llm_proxy',
-      data: {
-        protocol: 'openai',
-        baseURL: cfg.baseURL,
-        apiKey: cfg.apiKey,
-        model: cfg.model,
-        messages,
-        temperature: opts.temperature,
-        maxTokens: opts.maxTokens,
-        timeout: opts.timeout
-      }
-    });
+    const data: Record<string, unknown> = {
+      protocol: 'openai',
+      baseURL: cfg.baseURL,
+      model: cfg.model,
+      messages,
+      temperature: opts.temperature,
+      maxTokens: opts.maxTokens,
+      timeout: opts.timeout,
+    };
+    // 全局模型：key 由云端托管，仅告知代理走 useGlobal，不下发 apiKey
+    if (cfg.useGlobal) data.useGlobal = true;
+    else data.apiKey = cfg.apiKey;
+    const res: any = await Taro.cloud.callFunction({ name: 'llm_proxy', data });
     const result = res?.result;
     if (!result || result.code !== 0) {
       const errMsg = (result && result.message) || `代理调用失败（code ${result?.code}）`;
@@ -228,19 +228,19 @@ async function callAnthropic(cfg: LLMConfig, messages: ChatMessage[], opts: { te
   if (process.env.TARO_ENV === 'weapp') {
     logger.debug('[HTTP] llm.callAnthropic → 云函数代理 llm_proxy 模型:', cfg.model);
     const httpStart = Date.now();
-    const res: any = await Taro.cloud.callFunction({
-      name: 'llm_proxy',
-      data: {
-        protocol: 'anthropic',
-        baseURL: cfg.baseURL,
-        apiKey: cfg.apiKey,
-        model: cfg.model,
-        messages,
-        temperature: opts.temperature,
-        maxTokens: opts.maxTokens,
-        timeout: opts.timeout
-      }
-    });
+    const data: Record<string, unknown> = {
+      protocol: 'anthropic',
+      baseURL: cfg.baseURL,
+      model: cfg.model,
+      messages,
+      temperature: opts.temperature,
+      maxTokens: opts.maxTokens,
+      timeout: opts.timeout,
+    };
+    // 全局模型：key 由云端托管，仅告知代理走 useGlobal，不下发 apiKey
+    if (cfg.useGlobal) data.useGlobal = true;
+    else data.apiKey = cfg.apiKey;
+    const res: any = await Taro.cloud.callFunction({ name: 'llm_proxy', data });
     const result = res?.result;
     if (!result || result.code !== 0) {
       const errMsg = (result && result.message) || `代理调用失败（code ${result?.code}）`;

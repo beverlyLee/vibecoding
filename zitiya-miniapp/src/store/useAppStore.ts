@@ -1,31 +1,40 @@
 // 全局状态：LLM 设置 + 语录回填
 
 import { create } from 'zustand';
-import type { LLMConfig, LLMSettings } from '@/types/settings';
+import type { GlobalLLMPublic, LLMConfig, LLMSettings } from '@/types/settings';
 import { loadLLMSettings, saveLLMSettings } from '@/services/storage';
 import { getLLMPresets } from '@/services/sceneConfig';
+import { getGlobalLLMPublic } from '@/services/adminGlobalLLM';
 
 interface AppState {
   // LLM 设置
   settings: LLMSettings;
+  // 全局模型配置（管理后台统一配置，对所有用户生效）；null 表示未加载或未启用
+  globalLLM: GlobalLLMPublic | null;
   // 语录页回填到拆招页的内容（null 表示无待回填）
   pendingQuote: string | null;
   // 加载本地存储
   init: () => void;
+  // 拉取全局模型公开配置（带缓存），失败降级为 null
+  initGlobalLLM: () => Promise<void>;
   // 保存单个厂商配置
   saveLLMConfig: (cfg: LLMConfig) => void;
   // 切换启用的语言处理模型（传空串表示仅用内置规则）
   setActiveLLM: (key: string) => void;
   // 切换启用的语音识别模型
   setActiveAsr: (key: string) => void;
-  // 获取当前启用的配置；未启用返回 null
+  // 获取当前启用的配置；未启用返回 null（无用户配置时回退全局模型）
   getActiveLLM: () => LLMConfig | null;
-  // 获取语音识别配置：优先显式启用的识别模型，否则找任意已配置且支持音频的厂商
+  // 获取语音识别配置：优先显式启用的识别模型，否则找任意已配置且支持音频的厂商，再回退全局
   getAsrLLM: () => LLMConfig | null;
   // 语录回填
   setPendingQuote: (text: string) => void;
   clearPendingQuote: () => void;
 }
+
+// 全局模型配置加载状态（模块级缓存，避免重复拉取）
+let _globalLLMLoaded = false;
+let _globalLLMPromise: Promise<void> | null = null;
 
 function toConfig(key: string, existing?: LLMConfig): LLMConfig {
   const preset = getLLMPresets().find((p) => p.key === key);
@@ -43,6 +52,7 @@ function toConfig(key: string, existing?: LLMConfig): LLMConfig {
 
 export const useAppStore = create<AppState>((set, get) => ({
   settings: { configs: {}, activeKey: '' },
+  globalLLM: null,
   pendingQuote: null,
 
   init: () => {
@@ -89,14 +99,31 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   getActiveLLM: () => {
-    const { settings } = get();
-    if (!settings.activeKey) return null;
-    const cfg = settings.configs[settings.activeKey];
-    return cfg && cfg.apiKey ? cfg : null;
+    const { settings, globalLLM } = get();
+    // 1. 用户本地配置优先
+    if (settings.activeKey) {
+      const cfg = settings.configs[settings.activeKey];
+      if (cfg && cfg.apiKey) return cfg;
+    }
+    // 2. 回退：管理后台全局模型（key 由云端托管，本地仅持有公开配置 + useGlobal 标记）
+    if (globalLLM && globalLLM.enabled && globalLLM.baseURL && globalLLM.model) {
+      return {
+        key: 'global',
+        name: globalLLM.name || '全局模型',
+        protocol: globalLLM.protocol || 'openai',
+        baseURL: globalLLM.baseURL,
+        apiKey: '', // 实际 key 在云端，调用 llm_proxy 时走 useGlobal
+        model: globalLLM.model,
+        asrModel: globalLLM.asrModel,
+        configured: true,
+        useGlobal: true,
+      };
+    }
+    return null;
   },
 
   getAsrLLM: () => {
-    const { settings } = get();
+    const { settings, globalLLM } = get();
     // 1. 显式启用的语音识别模型优先
     if (settings.activeAsrKey) {
       const explicit = settings.configs[settings.activeAsrKey];
@@ -111,9 +138,41 @@ export const useAppStore = create<AppState>((set, get) => ({
     for (const cfg of Object.values(settings.configs)) {
       if (isAsrCapable(cfg)) return cfg;
     }
+    // 3. 全局模型兜底（若全局配置了 asrModel）
+    if (globalLLM && globalLLM.enabled && globalLLM.asrModel) {
+      return {
+        key: 'global',
+        name: globalLLM.name || '全局模型',
+        protocol: globalLLM.protocol || 'openai',
+        baseURL: globalLLM.baseURL,
+        apiKey: '',
+        model: globalLLM.model,
+        asrModel: globalLLM.asrModel,
+        configured: true,
+        useGlobal: true,
+      };
+    }
     return null;
+  },
+
+  initGlobalLLM: () => {
+    if (_globalLLMLoaded) return Promise.resolve();
+    if (_globalLLMPromise) return _globalLLMPromise;
+    _globalLLMPromise = (async () => {
+      try {
+        const pub = await getGlobalLLMPublic();
+        _globalLLMLoaded = true;
+        set({ globalLLM: pub });
+      } catch (e) {
+        _globalLLMLoaded = true;
+        set({ globalLLM: null });
+      } finally {
+        _globalLLMPromise = null;
+      }
+    })();
+    return _globalLLMPromise;
   },
 
   setPendingQuote: (text) => set({ pendingQuote: text }),
   clearPendingQuote: () => set({ pendingQuote: null })
-}));
+}));;

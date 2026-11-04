@@ -10,6 +10,7 @@
 
 const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
+const db = cloud.database();
 
 const http = require('http');
 const https = require('https');
@@ -82,34 +83,58 @@ exports.main = async (event) => {
     messages = [],
     temperature,
     maxTokens,
-    timeout = 55000
+    timeout = 55000,
+    useGlobal = false
   } = event || {};
 
-  if (!baseURL || !apiKey || !model) {
+  let resolvedProtocol = protocol;
+  let resolvedBase = baseURL;
+  let resolvedKey = apiKey;
+  let resolvedModel = model;
+
+  // 全局模式：从云端 global_llm_config 读取密钥（key 不下发客户端，规避暴露）
+  if (useGlobal) {
+    try {
+      const docRes = await db.collection('global_llm_config').doc('default').get();
+      const g = docRes && docRes.data;
+      if (!g || !g.enabled || !g.apiKey || !g.baseURL || !g.model) {
+        return { code: 400, message: '全局模型未配置或未启用（请到管理后台配置全局模型）', data: null };
+      }
+      resolvedProtocol = g.protocol || 'openai';
+      resolvedBase = g.baseURL;
+      resolvedKey = g.apiKey;
+      resolvedModel = g.model;
+      logf('info', `走全局模型配置: protocol=${resolvedProtocol} model=${resolvedModel}`);
+    } catch (e) {
+      return { code: 500, message: '读取全局模型配置失败: ' + (e && e.message || String(e)), data: null };
+    }
+  }
+
+  if (!resolvedBase || !resolvedKey || !resolvedModel) {
     return { code: 400, message: '缺少 baseURL / apiKey / model', data: null };
   }
 
-  const isAnthropic = protocol === 'anthropic';
-  const cleanBase = baseURL.replace(/\/+$/, '');
+  const isAnthropic = resolvedProtocol === 'anthropic';
+  const cleanBase = resolvedBase.replace(/\/+$/, '');
   const suffix = isAnthropic ? '/v1/messages' : '/chat/completions';
   const targetUrl = cleanBase + suffix;
 
   const headers = {};
   let body;
   if (isAnthropic) {
-    headers['x-api-key'] = apiKey;
+    headers['x-api-key'] = resolvedKey;
     headers['anthropic-version'] = '2023-06-01';
     const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n');
     body = {
-      model,
+      model: resolvedModel,
       max_tokens: maxTokens,
       temperature,
       system: system || undefined,
       messages: messages.filter((m) => m.role !== 'system')
     };
   } else {
-    headers['Authorization'] = `Bearer ${apiKey}`;
-    body = { model, messages, temperature, max_tokens: maxTokens, stream: false };
+    headers['Authorization'] = `Bearer ${resolvedKey}`;
+    body = { model: resolvedModel, messages, temperature, max_tokens: maxTokens, stream: false };
   }
 
   logf('info', `转发 ${protocol} -> ${targetUrl} model=${model}`);

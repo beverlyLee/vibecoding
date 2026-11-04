@@ -222,6 +222,8 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
   await initCloudConfig();
   // 先确保用户语录已加载（未登录降级空数组，不阻塞）
   await initUserQuotes();
+  // 加载全局模型配置（管理后台统一配置，无个人配置时引擎走全局模型）
+  await useAppStore.getState().initGlobalLLM();
   const startTime = Date.now();
 
   const cfg = useAppStore.getState().getActiveLLM();
@@ -389,6 +391,8 @@ export async function rephraseResponse(
   currentText: string
 ): Promise<string> {
   logger.debug('[API] engine.rephraseResponse ← 入口, 风格', response.style);
+  // 确保全局模型配置已加载，否则未配个人模型的用户无法走全局 LLM 换说法
+  await useAppStore.getState().initGlobalLLM();
   const cfg = useAppStore.getState().getActiveLLM();
   if (cfg) {
     try {

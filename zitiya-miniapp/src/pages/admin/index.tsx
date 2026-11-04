@@ -8,6 +8,7 @@ import {
   AttackCategoryManagement,
   AttackSceneManagement,
   DailyManagement,
+  GlobalLLMManagement,
   IntentManagement,
   ModelParamsManagement,
   PresetManagement,
@@ -19,7 +20,7 @@ import styles from './index.module.scss';
 
 type TabKey =
   | 'quotes' | 'users' | 'intents' | 'topics' | 'model'
-  | 'daily' | 'apibase' | 'attack' | 'attackcat' | 'presets' | 'prompts';
+  | 'daily' | 'apibase' | 'attack' | 'attackcat' | 'presets' | 'prompts' | 'globalllm';
 
 type TabItem =
   | { kind: 'label'; label: string }
@@ -40,6 +41,7 @@ const TABS: TabItem[] = [
   { kind: 'tab', key: 'attackcat', label: '出招分类' },
   { kind: 'tab', key: 'presets', label: 'LLM预设' },
   { kind: 'tab', key: 'prompts', label: '提示词' },
+  { kind: 'tab', key: 'globalllm', label: '全局模型' },
 ];
 
 export default function AdminPage() {
@@ -83,6 +85,7 @@ export default function AdminPage() {
       case 'attackcat': return <AttackCategoryManagement isAdmin={isAdmin} />;
       case 'presets': return <PresetManagement isAdmin={isAdmin} />;
       case 'prompts': return <PromptManagement isAdmin={isAdmin} />;
+      case 'globalllm': return <GlobalLLMManagement isAdmin={isAdmin} />;
       default: return <QuoteLibraryManagement isAdmin={isAdmin} />;
     }
   }

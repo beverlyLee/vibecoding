@@ -20,6 +20,11 @@ import {
   adminSaveTopics,
 } from '@/services/adminConfig';
 import {
+  adminGetGlobalLLM,
+  adminSaveGlobalLLM,
+  adminTestGlobalLLM,
+} from '@/services/adminGlobalLLM';
+import {
   adminListDailyQuotes,
   adminDailyStats,
   adminRemoveDailyQuote,
@@ -56,6 +61,7 @@ import { ATTACK_CATEGORIES, ATTACK_SCENES } from '@/data/attackScenes';
 import { INTENT_RULES } from '@/data/intents';
 import { QUOTES } from '@/data/quotes';
 import { LLM_PRESETS } from '@/types/settings';
+import type { GlobalLLMConfig } from '@/types/settings';
 import styles from './index.module.scss';
 
 const MODEL_PURPOSES = ['default', 'analyze', 'quoteGen', 'rephrase', 'test'];
@@ -1167,6 +1173,117 @@ function QuoteLibraryManagement({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
+// ================================================================
+// 全局模型配置（管理后台统一配置，对所有用户生效）
+// ================================================================
+function GlobalLLMManagement({ isAdmin }: { isAdmin: boolean }) {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [cfg, setCfg] = useState<GlobalLLMConfig>({
+    enabled: false,
+    name: '',
+    protocol: 'openai',
+    baseURL: '',
+    apiKey: '',
+    model: '',
+    asrModel: '',
+  });
+
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    adminGetGlobalLLM()
+      .then((data) => {
+        if (alive && data) {
+          setCfg({
+            enabled: !!data.enabled,
+            name: data.name || '',
+            protocol: data.protocol === 'anthropic' ? 'anthropic' : 'openai',
+            baseURL: data.baseURL || '',
+            apiKey: data.apiKey || '',
+            model: data.model || '',
+            asrModel: data.asrModel || '',
+          });
+        }
+      })
+      .catch((e: any) => Taro.showToast({ title: e?.message || '加载失败', icon: 'none' }))
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function patch(p: Partial<GlobalLLMConfig>) {
+    setCfg((c) => ({ ...c, ...p }));
+  }
+
+  async function onSave() {
+    setSaving(true);
+    try {
+      await adminSaveGlobalLLM(cfg);
+      Taro.showToast({ title: '全局模型已保存', icon: 'success' });
+    } catch (e: any) {
+      Taro.showToast({ title: e?.message || '保存失败', icon: 'none' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onTest() {
+    setTesting(true);
+    try {
+      const r = await adminTestGlobalLLM();
+      Taro.showToast({ title: r.message || '连接成功', icon: 'none' });
+    } catch (e: any) {
+      Taro.showToast({ title: e?.message || '测试失败', icon: 'none' });
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  if (loading) return <Text className={styles.emptyTip}>加载中…</Text>;
+
+  return (
+    <View>
+      <SectionHeader title='全局模型配置' desc='配置一个全局生效的模型：所有用户在「我的」页未单独配置时自动复用，AI 能力开箱即用。API Key 仅存云端，不下发客户端。' />
+      <View className={styles.card}>
+        <View className={styles.cardHead}>
+          <Text className={styles.cardTitle}>启用全局模型</Text>
+          <Text
+            className={[styles.chip, cfg.enabled && styles.chipActive].filter(Boolean).join(' ')}
+            onClick={() => isAdmin && patch({ enabled: !cfg.enabled })}
+          >{cfg.enabled ? '已启用' : '已停用'}</Text>
+        </View>
+        <Text className={styles.fieldLabel}>展示名称</Text>
+        <Input className={styles.inlineInput} value={cfg.name} placeholder='如：默认豆包模型' onInput={(e) => patch({ name: e.detail.value })} />
+        <Text className={styles.fieldLabel}>协议</Text>
+        <Picker mode='selector' range={PROTOCOLS} value={cfg.protocol === 'anthropic' ? 1 : 0}
+          onChange={(e) => patch({ protocol: PROTOCOLS[Number(e.detail.value)] as any })}>
+          <View className={styles.pickerBox}><Text>{cfg.protocol}</Text></View>
+        </Picker>
+        <Text className={styles.fieldLabel}>baseURL</Text>
+        <Input className={styles.inlineInput} value={cfg.baseURL} placeholder='https://ark.cn-beijing.volces.com/api/v3' onInput={(e) => patch({ baseURL: e.detail.value })} />
+        <Text className={styles.fieldLabel}>model</Text>
+        <Input className={styles.inlineInput} value={cfg.model} placeholder='doubao-1-5-pro-32k-250115' onInput={(e) => patch({ model: e.detail.value })} />
+        <Text className={styles.fieldLabel}>API Key（仅存云端）</Text>
+        <Input className={styles.inlineInput} value={cfg.apiKey} placeholder='sk-...' password onInput={(e) => patch({ apiKey: e.detail.value })} />
+        <Text className={styles.fieldLabel}>语音识别模型（可选）</Text>
+        <Input className={styles.inlineInput} value={cfg.asrModel} placeholder='如：FunAudioLLM/SenseVoiceSmall' onInput={(e) => patch({ asrModel: e.detail.value })} />
+        {isAdmin && (
+          <Button size='mini' className={styles.addBtn} loading={testing} onClick={onTest}>
+            {testing ? '测试中…' : '连接测试'}
+          </Button>
+        )}
+      </View>
+      <SaveBar isAdmin={isAdmin} saving={saving} onSave={onSave} />
+    </View>
+  );
+}
+
 export {
   IntentManagement,
   QuoteLibraryManagement,
@@ -1178,4 +1295,5 @@ export {
   AttackCategoryManagement,
   PresetManagement,
   PromptManagement,
+  GlobalLLMManagement,
 };
