@@ -5,6 +5,7 @@ import { authStore } from '@/store/useUserStore';
 import { initCloudConfig } from '@/services/sceneConfig';
 import { logger } from '@/utils/logger';
 import { initMonitor } from '@/utils/monitor';
+import { initPrivacyAuthorization } from '@/utils/privacy';
 // 全局样式
 import './app.scss';
 
@@ -17,6 +18,8 @@ function App(props) {
   useEffect(() => {
     if (process.env.TARO_ENV === 'weapp') {
       Taro.cloud.init({ env: CLOUD_ENV, traceUser: true, timeout: 60000 });
+      // 云环境就绪后立即注册隐私授权流程（项目已开启 __usePrivacyCheck__）
+      initPrivacyAuthorization();
     }
     // 云环境初始化后再启动全局监控（保证 track 上报通道可用）
     initMonitor();
