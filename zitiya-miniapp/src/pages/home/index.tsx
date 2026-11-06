@@ -3,6 +3,7 @@ import { View, Text, Image } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
 import { useUserStore } from '@/store/useUserStore';
 import { useAppStore } from '@/store/useAppStore';
+import { useLoginSheet } from '@/hooks/useLoginSheet';
 import logoDuck from '@/assets/logo.png';
 import styles from './index.module.scss';
 import { track } from '@/utils/logger';
@@ -38,8 +39,9 @@ const ENTRIES: QuickEntry[] = [
 export default function HomePage() {
   const [greeting, setGreeting] = useState(getGreeting);
   const [tips, setTips] = useState<SocialTip[]>(FALLBACK_TIPS);
-  const { status, user } = useUserStore();
+  const { status, user, requireLogin } = useUserStore();
   const activeLLM = useAppStore((s) => s.getActiveLLM());
+  const loginSheet = useLoginSheet();
 
   const isLoggedIn = status === 'authenticated' && !!user;
   const displayName = user?.nickname || '朋友';
@@ -74,6 +76,19 @@ export default function HomePage() {
         </View>
       </View>
 
+      {/* 未登录提示条：点击弹出登录弹层 */}
+      {!isLoggedIn && (
+        <View className={styles.loginBanner}>
+          <Text className={styles.loginBannerText}>登录后使用更多功能哦</Text>
+          <View
+            className={styles.loginBannerBtn}
+            onClick={() => requireLogin('登录后使用更多功能')}
+          >
+            <Text className={styles.loginBannerBtnText}>去登录</Text>
+          </View>
+        </View>
+      )}
+
       {/* 快捷入口 */}
       <View className={styles.sectionTitle}>快捷入口</View>
       <View className={styles.grid}>
@@ -103,6 +118,8 @@ export default function HomePage() {
       <Text className={styles.footerTip}>
         鸭鸭只是帮你组织语言，开口前记得结合当下语境哦
       </Text>
+
+      {loginSheet}
     </View>
   );
 }

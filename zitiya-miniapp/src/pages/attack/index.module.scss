@@ -82,3 +82,38 @@
 .emptyList {
   margin-top: 48rpx;
 }
+
+// 未登录引导卡（免费看前 3 个场景后出现）
+.lockedCard {
+  margin: $spacing-md 0;
+  padding: $spacing-lg;
+  border-radius: $radius-lg;
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.08), rgba(255, 152, 0, 0.08));
+  border: 1rpx solid rgba(255, 152, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.lockedTitle {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+}
+
+.lockedDesc {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  line-height: 1.6;
+}
+
+.lockedBtn {
+  margin-top: 12rpx;
+  align-self: flex-start;
+  padding: 8rpx 24rpx;
+  border-radius: $radius-round;
+  font-size: $font-size-sm;
+  color: $color-on-primary;
+  background: $color-gradient-primary;
+  font-weight: $font-weight-medium;
+}

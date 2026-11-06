@@ -46,6 +46,42 @@
   margin-top: 6rpx;
 }
 
+// 未登录提示条
+.loginBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #fff5eb 0%, #ffe3c7 100%);
+  border: 1rpx solid #ffcf9e;
+  border-radius: $radius-xl;
+  padding: 20rpx 28rpx;
+  margin-bottom: $spacing-lg;
+  box-shadow: $shadow-card;
+}
+
+.loginBannerText {
+  font-size: $font-size-sm;
+  color: #b5651d;
+  flex: 1;
+}
+
+.loginBannerBtn {
+  background: linear-gradient(135deg, #ff8c3a 0%, #e8651a 100%);
+  border-radius: $radius-round;
+  padding: 12rpx 36rpx;
+  box-shadow: 0 4rpx 12rpx rgba(232, 101, 26, 0.3);
+
+  &:active {
+    opacity: 0.85;
+  }
+}
+
+.loginBannerBtnText {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: #ffffff;
+}
+
 // 区块标题
 .sectionTitle {
   font-size: $font-size-sm;
