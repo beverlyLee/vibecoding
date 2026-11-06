@@ -174,14 +174,15 @@ async function callOpenAI(cfg: LLMConfig, messages: ChatMessage[], opts: { tempe
     // 全局模型：key 由云端托管，仅告知代理走 useGlobal，不下发 apiKey
     if (cfg.useGlobal) data.useGlobal = true;
     else data.apiKey = cfg.apiKey;
-    const res: any = await Taro.cloud.callFunction({ name: 'llm_proxy', data });
+    const res: any = await Taro.cloud.callFunction({ name: 'llm_proxy', data, timeout: 55 });
     const result = res?.result;
+    logger.debug('[HTTP] llm.callOpenAI 代理原始返回:', JSON.stringify(result).slice(0, 300));
     if (!result || result.code !== 0) {
       const errMsg = (result && result.message) || `代理调用失败（code ${result?.code}）`;
       logger.error('[HTTP] llm.callOpenAI ✘ 代理', `${Date.now() - httpStart}ms`, errMsg);
       throw new Error(errMsg);
     }
-    logger.debug('[HTTP] llm.callOpenAI ✔ 代理', `${Date.now() - httpStart}ms`);
+    logger.debug('[HTTP] llm.callOpenAI ✔ 代理', `${Date.now() - httpStart}ms`, 'text长度:', result?.data?.text?.length || 0);
     return { text: result.data.text, usage: result.data.usage };
   }
   // 非小程序（H5 等）：保留直连
@@ -240,7 +241,7 @@ async function callAnthropic(cfg: LLMConfig, messages: ChatMessage[], opts: { te
     // 全局模型：key 由云端托管，仅告知代理走 useGlobal，不下发 apiKey
     if (cfg.useGlobal) data.useGlobal = true;
     else data.apiKey = cfg.apiKey;
-    const res: any = await Taro.cloud.callFunction({ name: 'llm_proxy', data });
+    const res: any = await Taro.cloud.callFunction({ name: 'llm_proxy', data, timeout: 55 });
     const result = res?.result;
     if (!result || result.code !== 0) {
       const errMsg = (result && result.message) || `代理调用失败（code ${result?.code}）`;

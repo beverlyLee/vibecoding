@@ -200,7 +200,7 @@ async function actionSaveItem(event) {
 // action: toggle（admin，切换 enabled）
 // ================================================================
 async function actionToggle(event) {
-  await requireRole('admin');
+  await requireRole('operator');
   const id = event && event.id;
   if (!id) return err('缺少 id');
   const doc = await readDoc();
@@ -247,35 +247,24 @@ async function actionTest(event) {
   await requireRole('admin');
   let target;
   if (event && event.config) {
-    // 前端直接透传草稿配置（不依赖已保存）
     const c = event.config;
-    if (!c.baseURL || !c.apiKey || !c.model) {
-      return err('配置不完整：缺少 baseURL / apiKey / model');
-    }
-    target = {
-      protocol: c.protocol || 'openai',
-      baseURL: c.baseURL,
-      apiKey: c.apiKey,
-      model: c.model,
-    };
+    if (!c.baseURL || !c.apiKey || !c.model) return err('配置不完整：缺少 baseURL / apiKey / model');
+    target = { protocol: c.protocol || 'openai', baseURL: c.baseURL, apiKey: c.apiKey, model: c.model };
   } else {
     const doc = await readDoc();
     const items = doc.items || [];
-    if (event && event.id) {
-      target = items.find((it) => it.id === event.id);
-    } else {
-      target = items.find((it) => it.enabled);
-    }
+    if (event && event.id) target = items.find((it) => it.id === event.id);
+    else target = items.find((it) => it.enabled);
     if (!target) return err('未找到可测试的配置，请先保存或填写完整配置');
-    if (!target.apiKey || !target.baseURL || !target.model) {
-      return err('配置不完整：缺少 apiKey / baseURL / model');
-    }
+    if (!target.apiKey || !target.baseURL || !target.model) return err('配置不完整：缺少 apiKey / baseURL / model');
   }
   try {
+    // 测试链路 = 生产链路：都走 llm_proxy，保证一致性
+    console.log('[admin_global_llm.test] 转发到 llm_proxy, model=', target.model);
     const res = await cloud.callFunction({
       name: 'llm_proxy',
       data: {
-        useGlobal: false, // 直接透传测试
+        useGlobal: false,
         protocol: target.protocol || 'openai',
         baseURL: target.baseURL,
         apiKey: target.apiKey,
@@ -290,9 +279,10 @@ async function actionTest(event) {
     if (!result || result.code !== 0) {
       return err('连接失败：' + ((result && result.message) || '未知错误'));
     }
-    const text = String(result.data && result.data.text || '').slice(0, 30);
+    const text = String(result.data && result.data.text || '').trim().slice(0, 30);
     return reply(0, 'ok', { message: '连接成功：' + text });
   } catch (e) {
+    console.error('[admin_global_llm.test] 异常:', e && e.message);
     return err('连接测试异常：' + (e && e.message || String(e)));
   }
 }

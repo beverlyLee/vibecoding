@@ -5,12 +5,12 @@ import InputPanel from '@/components/InputPanel';
 import IntentCard from '@/components/IntentCard';
 import ResponseCard from '@/components/ResponseCard';
 import EmptyState from '@/components/EmptyState';
-import { analyzeUtterance, rephraseResponse, copyText } from '@/services/engine';
-import { userQuotesAdd } from '@/services/userQuotes';
+import { analyzeUtterance, rephraseResponse, copyText, extractKeywordsFromUtterance } from '@/services/engine';
 import { getAllUserQuotes, invalidateUserQuotes, initUserQuotes } from '@/services/sceneConfig';
 import { useAppStore } from '@/store/useAppStore';
 import { useUserStore } from '@/store/useUserStore';
 import { useLoginSheet } from '@/hooks/useLoginSheet';
+import AddQuoteSheet from '@/pages/quotes/AddQuoteSheet';
 import type { AnalysisResult, Response } from '@/types/analysis';
 import logoDuck from '@/assets/logo.png';
 import styles from './index.module.scss';
@@ -22,25 +22,9 @@ function showSourceToast(source: string) {
   switch (source) {
     case 'rule':
     case 'llm':
-      // 正常命中，静默
-      break;
     case 'fallback':
-      // LLM 配了但调失败
-      Taro.showToast({ title: 'AI 暂不可用，已用兜底话术', icon: 'none', duration: 2000 });
-      break;
     case 'fallback_no_llm':
-      // 规则库没匹配到 + 没配 LLM —— 引导去配置
-      Taro.showModal({
-        title: '默认规则库没匹配到',
-        content: '可以在设置里配置你的大模型，开启后能识别更多场景并生成更贴切的回话。',
-        confirmText: '去我的',
-        cancelText: '算了',
-        success: (res) => {
-          if (res.confirm) {
-            Taro.switchTab({ url: '/pages/profile/index' });
-          }
-        },
-      });
+      // 正常命中 / LLM 降级 / 规则库未匹配但无 LLM —— 全部静默，结果照展示
       break;
   }
 }
@@ -49,8 +33,11 @@ function showSourceToast(source: string) {
 export default function DefendPage() {
   const [inputText, setInputText] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
+  const [analyzeSource, setAnalyzeSource] = useState<'llm' | 'rule' | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [rephrasingId, setRephrasingId] = useState<string | null>(null);
+  const [quoteSheetVisible, setQuoteSheetVisible] = useState(false);
+  const [quoteSheetPrefill, setQuoteSheetPrefill] = useState<{ content: string; category: string; note: string; keywords: string[] } | null>(null);
   const activeLLM = useAppStore((s) => s.getActiveLLM());
   const clearPendingQuote = useAppStore((s) => s.clearPendingQuote);
   const { status, user, requireLogin } = useUserStore();
@@ -80,7 +67,9 @@ export default function DefendPage() {
 
   const runAnalyze = async (text: string, source: string = '手动点击') => {
     if (!text.trim()) return;
+    const hasLLM = !!useAppStore.getState().getActiveLLM();
     setAnalyzing(true);
+    setAnalyzeSource(hasLLM ? 'llm' : 'rule');
     track(EVENTS.ANALYZE_START, {
       from: source,
       engineType: useAppStore.getState().getActiveLLM() ? 'llm' : 'rule',
@@ -102,6 +91,7 @@ export default function DefendPage() {
       Taro.showToast({ title: '分析出错了，再试一次', icon: 'none' });
     } finally {
       setAnalyzing(false);
+      setAnalyzeSource(null);
     }
   };
 
@@ -142,7 +132,7 @@ export default function DefendPage() {
     }
   };
 
-  // 把大模型/规则生成的回话加入「我的语录」
+  // 把大模型/规则生成的回话加入「我的语录」→ 弹出添加语录框预填充
   const handleAddToMine = async (text: string, fromAI: boolean) => {
     if (!loggedIn) {
       requireLogin('加入我的语录');
@@ -159,24 +149,20 @@ export default function DefendPage() {
       return;
     }
 
-    try {
-      const note = fromAI
-        ? `AI 生成 · 原话：${(result?.utterance || '').slice(0, 80)}`
-        : '拆招回话';
-      await userQuotesAdd({
-        content: trimmed,
-        category: 'AI 定制',
-        note,
-        aiGenerated: fromAI,
-      });
-      invalidateUserQuotes(); // 刷新本地缓存，语录页「我的语录」立即可见
-      Taro.showToast({ title: '已加入我的语录 ✨', icon: 'success' });
-    } catch (err: any) {
-      Taro.showToast({ title: err?.message || '加入失败', icon: 'none' });
-    }
-  };
+    const utterance = result?.utterance || '';
+    const extractedKeywords = extractKeywordsFromUtterance(utterance);
+    const note = fromAI
+      ? `AI 生成 · 原话：${utterance.slice(0, 80)}`
+      : '拆招回话';
 
-  const engineLabel = activeLLM ? `当前引擎：${activeLLM.name}` : '当前引擎：内置规则';
+    setQuoteSheetPrefill({
+      content: trimmed,
+      category: 'AI 定制',
+      note,
+      keywords: extractedKeywords,
+    });
+    setQuoteSheetVisible(true);
+  };
 
   return (
     <View className={styles.page}>
@@ -216,14 +202,6 @@ export default function DefendPage() {
               <Text className={styles.stepLabel}>复制回话</Text>
             </View>
           </View>
-          <View
-            className={styles.enginePill}
-            onClick={() => Taro.switchTab({ url: '/pages/profile/index' })}
-          >
-            <Text className={styles.enginePillText}>
-              {engineLabel} · 去「我的」可升级 AI 引擎 ›
-            </Text>
-          </View>
         </View>
       </View>
 
@@ -235,7 +213,14 @@ export default function DefendPage() {
         {analyzing && (
           <View className={styles.thinking}>
             <Image className={styles.thinkingDuck} src={logoDuck} mode='aspectFit' />
-            <Text className={styles.thinkingText}>鸭鸭正在拆解对方意图…</Text>
+            <View className={styles.thinkingDots}>
+              <View className={styles.thinkingDot} />
+              <View className={styles.thinkingDot} />
+              <View className={styles.thinkingDot} />
+            </View>
+            <Text className={styles.thinkingText}>
+              {analyzeSource === 'llm' ? '正在查询大模型，小主稍等…' : '鸭鸭正在拆解对方意图…'}
+            </Text>
           </View>
         )}
 
@@ -255,24 +240,32 @@ export default function DefendPage() {
               <IntentCard result={result} />
             </View>
 
-            {/* 我的语录专属卡片：命中时并行展示，未命中不渲染 */}
-            {result.userQuote && (
+            {/* 我的语录专属卡片：命中时并行展示（最多 3 条，按匹配度排序） */}
+            {result.userQuotes && result.userQuotes.length > 0 && (
               <View className={styles.userQuoteSection}>
-                <View className={styles.userQuoteCard}>
-                  <View className={styles.userQuoteHead}>
-                    <Text className={styles.userQuoteTag}>✨ 我的语录</Text>
-                    {result.userQuote.category ? (
-                      <Text className={styles.userQuoteCat}>{result.userQuote.category}</Text>
-                    ) : null}
-                  </View>
-                  <Text className={styles.userQuoteContent}>{result.userQuote.content}</Text>
-                  <View
-                    className={styles.userQuoteCopy}
-                    onClick={() => handleCopy(result.userQuote!.content)}
-                  >
-                    <Text className={styles.userQuoteCopyText}>复制这条</Text>
-                  </View>
+                <View className={styles.userQuoteSectionHead}>
+                  <Text className={styles.userQuoteTag}>✨ 我的语录</Text>
+                  <Text className={styles.userQuoteCount}>
+                    命中 {result.userQuotes.length} 条相似话术
+                  </Text>
                 </View>
+                {result.userQuotes.map((q, idx) => (
+                  <View key={q.id} className={styles.userQuoteCard}>
+                    <View className={styles.userQuoteHead}>
+                      <Text className={styles.userQuoteRank}>#{idx + 1}</Text>
+                      {q.category ? (
+                        <Text className={styles.userQuoteCat}>{q.category}</Text>
+                      ) : null}
+                    </View>
+                    <Text className={styles.userQuoteContent}>{q.content}</Text>
+                    <View
+                      className={styles.userQuoteCopy}
+                      onClick={() => handleCopy(q.content)}
+                    >
+                      <Text className={styles.userQuoteCopyText}>复制这条</Text>
+                    </View>
+                  </View>
+                ))}
               </View>
             )}
 
@@ -298,6 +291,13 @@ export default function DefendPage() {
       </Text>
 
       {loginSheet}
+
+      <AddQuoteSheet
+        visible={quoteSheetVisible}
+        onClose={() => setQuoteSheetVisible(false)}
+        onSaved={() => setQuoteSheetVisible(false)}
+        prefill={quoteSheetPrefill}
+      />
     </View>
   );
 }

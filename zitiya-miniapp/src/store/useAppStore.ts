@@ -100,10 +100,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   getActiveLLM: () => {
     const { settings, globalLLM } = get();
-    // 1. 用户本地配置优先
+    // 1. 用户本地配置优先（但必须完整：apiKey 或 useGlobal 标记 + baseURL + model）
     if (settings.activeKey) {
       const cfg = settings.configs[settings.activeKey];
-      if (cfg && cfg.apiKey) return cfg;
+      if (cfg && cfg.baseURL && cfg.model && (cfg.apiKey || cfg.useGlobal)) return cfg;
     }
     // 2. 回退：管理后台全局模型（key 由云端托管，本地仅持有公开配置 + useGlobal 标记）
     if (globalLLM && globalLLM.enabled && globalLLM.baseURL && globalLLM.model) {
@@ -156,17 +156,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   initGlobalLLM: () => {
-    if (_globalLLMLoaded) return Promise.resolve();
+    // 每次强制刷新：避免首次启动时集合还不存在导致 null 被永久缓存
     if (_globalLLMPromise) return _globalLLMPromise;
     _globalLLMPromise = (async () => {
       try {
         const pub = await getGlobalLLMPublic();
-        _globalLLMLoaded = true;
         set({ globalLLM: pub });
       } catch (e) {
-        _globalLLMLoaded = true;
         set({ globalLLM: null });
       } finally {
+        _globalLLMLoaded = true;
         _globalLLMPromise = null;
       }
     })();

@@ -30,7 +30,9 @@ export interface AnalysisResult {
   // 结果来源：rule 规则模板秒回 / llm 大模型返回 / fallback LLM调失败降级 / fallback_no_llm 规则无命中且未配置 LLM
   source: 'rule' | 'llm' | 'fallback' | 'fallback_no_llm';
   responses: Response[];
-  // 命中的「我的语录」专属卡片：引擎独立检索用户语录库，多条命中时随机挑一条；未命中为 null/undefined（不展示卡片）
+  // 命中的「我的语录」专属卡片：引擎独立检索用户语录库，多条命中时按得分排序全部返回；未命中为空数组
+  userQuotes?: Quote[];
+  // @deprecated 兼容旧逻辑，单条版本（取 userQuotes[0]）
   userQuote?: Quote | null;
   // 分析耗时（毫秒）
   costMs: number;

@@ -13,6 +13,13 @@ interface Props {
   onSaved: (quote: Quote) => void;
   /** 有值 → 编辑态；undefined → 新增态 */
   editingQuote?: Quote | null;
+  /** 新增态预填充（从拆招页等入口带过来的默认值） */
+  prefill?: {
+    content?: string;
+    category?: string;
+    note?: string;
+    keywords?: string[];
+  } | null;
 }
 
 // 过滤掉「全部」作为可选项分类
@@ -20,10 +27,10 @@ const CATEGORY_OPTIONS = QUOTE_CATEGORIES.filter((c) => c !== '全部');
 
 /**
  * 底部弹层：新增 / 编辑 我的语录
- * - editingQuote 为空 → 新增模式
+ * - editingQuote 为空 → 新增模式；有 prefill 时预填充内容
  * - editingQuote 有值 → 编辑模式，提交调 update
  */
-export default function AddUserQuoteSheet({ visible, onClose, onSaved, editingQuote }: Props) {
+export default function AddUserQuoteSheet({ visible, onClose, onSaved, editingQuote, prefill }: Props) {
   const isEdit = !!editingQuote?.id;
   const [content, setContent] = useState('');
   const [category, setCategory] = useState(CATEGORY_OPTIONS[0] || '自定义');
@@ -34,14 +41,13 @@ export default function AddUserQuoteSheet({ visible, onClose, onSaved, editingQu
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // 每次打开：重置 or 回填
+  // 每次打开：重置 or 回填 or 预填充
   React.useEffect(() => {
     if (visible) {
       if (editingQuote?.id) {
         // 编辑态 → 回填
         const q = editingQuote;
         setContent(q.content || '');
-        // 分类：若是预设选项就直接选，否则填到 customCategory
         if (CATEGORY_OPTIONS.includes(q.category)) {
           setCategory(q.category);
           setCustomCategory('');
@@ -51,6 +57,19 @@ export default function AddUserQuoteSheet({ visible, onClose, onSaved, editingQu
         }
         setNote(q.note || '');
         setKeywords(q.keywords ? [...q.keywords] : []);
+      } else if (prefill) {
+        // 新增态 + prefill → 预填充
+        setContent(prefill.content || '');
+        const prefillCat = prefill.category || CATEGORY_OPTIONS[0] || '自定义';
+        if (CATEGORY_OPTIONS.includes(prefillCat)) {
+          setCategory(prefillCat);
+          setCustomCategory('');
+        } else {
+          setCategory(CATEGORY_OPTIONS[0] || '自定义');
+          setCustomCategory(prefillCat);
+        }
+        setNote(prefill.note || '');
+        setKeywords(prefill.keywords ? [...prefill.keywords] : []);
       } else {
         // 新增态 → 重置
         setContent('');
@@ -63,7 +82,7 @@ export default function AddUserQuoteSheet({ visible, onClose, onSaved, editingQu
       setSaving(false);
       setDeleting(false);
     }
-  }, [visible, editingQuote?.id]);
+  }, [visible, editingQuote?.id, prefill]);
 
   if (!visible) return null;
 

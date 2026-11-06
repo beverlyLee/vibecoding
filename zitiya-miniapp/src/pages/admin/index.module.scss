@@ -350,6 +350,49 @@
   margin-left: 0;
 }
 
+.toggle {
+  padding: 6rpx 24rpx;
+  border-radius: 200rpx;
+  line-height: 1.6;
+  border: 1rpx solid transparent;
+}
+
+.toggleText {
+  font-size: $font-size-xs;
+}
+
+.toggleOn {
+  background: linear-gradient(135deg, #52c41a, #73d13d);
+  border-color: #52c41a;
+  .toggleText { color: #fff; }
+}
+
+.toggleOff {
+  background: #f5f5f5;
+  border-color: #d9d9d9;
+  .toggleText { color: #999; }
+}
+
+.cardFoot {
+  border-top: 1rpx solid #f1f4f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16rpx;
+  padding-top: 16rpx;
+}
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.switchLabel {
+  font-size: 24rpx;
+  color: #5a6678;
+}
+
 .card {
   background: $color-bg-card;
   border-radius: $radius-md;

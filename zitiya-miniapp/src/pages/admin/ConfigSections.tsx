@@ -3,7 +3,7 @@
 // operator 角色可查看，admin 角色可修改（保存按钮仅在 isAdmin 时渲染）。
 
 import { useEffect, useState, useMemo } from 'react';
-import { View, Text, Input, Textarea, Button, Picker, ScrollView } from '@tarojs/components';
+import { View, Text, Input, Textarea, Button, Picker, ScrollView, Switch } from '@tarojs/components';
 import Taro from '@tarojs/taro';
 import {
   adminGetConfig,
@@ -1362,16 +1362,11 @@ function GlobalLLMManagement({ isAdmin }: { isAdmin: boolean }) {
                     {item.protocol} · {item.model}
                   </Text>
                 </View>
-                <Text
-                  className={[styles.chip, item.enabled && styles.chipActive].filter(Boolean).join(' ')}
-                  onClick={() => isAdmin && onToggle(item.id)}
-                >
-                  {item.enabled ? '✓ 已启用' : '已停用'}
-                </Text>
               </View>
               <Text className={styles.metaTip}>{item.baseURL}</Text>
-              <View className={styles.cardHead}>
-                {isAdmin && (
+              {/* 底部：左操作按钮 + 右启用开关 */}
+              <View className={styles.cardFoot}>
+                {isAdmin ? (
                   <View className={styles.row2}>
                     <Button size='mini' className={styles.cardAction} onClick={() => startEdit(item)}>编辑</Button>
                     <Button size='mini' className={styles.cardAction} loading={testingId === item.id} onClick={() => onTest(item.id)}>
@@ -1379,7 +1374,11 @@ function GlobalLLMManagement({ isAdmin }: { isAdmin: boolean }) {
                     </Button>
                     <Button size='mini' className={[styles.cardAction, styles.delMini].join(' ')} onClick={() => onRemove(item.id)}>删除</Button>
                   </View>
-                )}
+                ) : <View />}
+                <View className={styles.switchRow}>
+                  <Text className={styles.switchLabel}>启用</Text>
+                  <Switch checked={item.enabled} color='#52c41a' onChange={() => onToggle(item.id)} />
+                </View>
               </View>
             </View>
           ))}
@@ -1397,10 +1396,7 @@ function GlobalLLMManagement({ isAdmin }: { isAdmin: boolean }) {
               </Text>
               <View className={styles.cardHead}>
                 <Text className={styles.fieldLabel}>启用此模型</Text>
-                <Text
-                  className={[styles.chip, draft.enabled && styles.chipActive].filter(Boolean).join(' ')}
-                  onClick={() => patchDraft({ enabled: !draft.enabled })}
-                >{draft.enabled ? '✓ 已启用' : '已停用'}</Text>
+                <Switch checked={draft.enabled} color='#52c41a' onChange={() => patchDraft({ enabled: !draft.enabled })} />
               </View>
             </View>
             <Button size='mini' onClick={cancelEdit}>取消</Button>

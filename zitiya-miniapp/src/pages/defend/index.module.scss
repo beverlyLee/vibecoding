@@ -142,15 +142,60 @@
 }
 
 .thinkingDuck {
-  width: 96rpx;
-  height: 96rpx;
-  animation: bounce 0.9s ease-in-out infinite;
+  width: 120rpx;
+  height: 120rpx;
+  animation: duckPulse 1.8s ease-in-out infinite;
+  filter: drop-shadow(0 8rpx 24rpx rgba(255, 183, 77, 0.45));
+}
+
+@keyframes duckPulse {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.08) rotate(-4deg); }
+  50% { transform: scale(1) rotate(0deg); }
+  75% { transform: scale(1.08) rotate(4deg); }
+}
+
+.thinkingDots {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12rpx;
+  margin-top: $spacing-md;
+}
+
+.thinkingDot {
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FFB74D, #FF8A65);
+  animation: dotWave 1.2s ease-in-out infinite;
+
+  &:nth-child(1) { animation-delay: 0s; }
+  &:nth-child(2) { animation-delay: 0.15s; }
+  &:nth-child(3) { animation-delay: 0.3s; }
+}
+
+@keyframes dotWave {
+  0%, 80%, 100% {
+    transform: translateY(0) scale(0.8);
+    opacity: 0.5;
+  }
+  40% {
+    transform: translateY(-16rpx) scale(1.1);
+    opacity: 1;
+  }
 }
 
 .thinkingText {
-  margin-top: $spacing-md;
+  margin-top: $spacing-sm;
   font-size: $font-size-md;
   color: $color-text-tertiary;
+  animation: textShimmer 2.4s ease-in-out infinite;
+}
+
+@keyframes textShimmer {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
 }
 
 @keyframes bounce {
@@ -170,6 +215,15 @@
 // ===== 我的语录专属卡片 =====
 .userQuoteSection {
   margin-bottom: $spacing-md;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.userQuoteSectionHead {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
 }
 
 .userQuoteCard {
@@ -190,6 +244,28 @@
   font-size: $font-size-sm;
   font-weight: $font-weight-semibold;
   color: #e8651a;
+}
+
+.userQuoteCount {
+  font-size: $font-size-xs;
+  color: #b5651d;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: $radius-round;
+  padding: 4rpx 16rpx;
+}
+
+.userQuoteRank {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: #e8651a;
+  color: #ffffff;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12rpx;
 }
 
 .userQuoteCat {

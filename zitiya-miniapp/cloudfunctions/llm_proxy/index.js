@@ -20,6 +20,29 @@ function logf(level, msg) {
   console.log(JSON.stringify({ ts: Date.now(), level, fn: 'llm_proxy', msg }));
 }
 
+// 从 Responses API 的 output 数组中提取 assistant 文本
+// 格式参考：[{type:"message", role:"assistant", content:[{type:"output_text", text:"..."}]}, ...]
+function extractResponsesText(outputArr) {
+  if (!Array.isArray(outputArr)) return '';
+  const parts = [];
+  for (const item of outputArr) {
+    if (!item || typeof item !== 'object') continue;
+    // 标准 Responses API：type="message" + role="assistant"
+    if (item.type === 'message' && item.role === 'assistant' && Array.isArray(item.content)) {
+      for (const c of item.content) {
+        if (c && c.type === 'output_text' && typeof c.text === 'string') {
+          parts.push(c.text);
+        }
+      }
+    }
+    // 兜底：直接有 text 字段的 item
+    if (typeof item.text === 'string' && item.text) {
+      parts.push(item.text);
+    }
+  }
+  return parts.join('');
+}
+
 // 用内置 http/https 发一次 JSON POST，返回 { status, json }
 function requestJSON(targetUrl, headers, bodyObj, timeoutMs) {
   return new Promise((resolve, reject) => {
@@ -129,8 +152,11 @@ exports.main = async (event) => {
 
   const isAnthropic = resolvedProtocol === 'anthropic';
   const cleanBase = resolvedBase.replace(/\/+$/, '');
+  // 智能检测：如果 baseURL 已经包含完整 endpoint 路径（用户可能直接填了完整 URL），就不再拼接
+  const hasChatEndpoint = /\/(chat\/completions|completions|responses|messages)(\/|$|\?)/i.test(cleanBase);
   const suffix = isAnthropic ? '/v1/messages' : '/chat/completions';
-  const targetUrl = cleanBase + suffix;
+  const targetUrl = hasChatEndpoint ? cleanBase : cleanBase + suffix;
+  if (hasChatEndpoint) logf('warn', `baseURL 已包含 endpoint 路径，跳过自动拼接 suffix=${suffix}`);
 
   const headers = {};
   let body;
@@ -173,14 +199,36 @@ exports.main = async (event) => {
         ? { prompt: json.usage.input_tokens, completion: json.usage.output_tokens }
         : undefined;
     } else {
+      // 优先级1：标准 Chat Completions 格式
       text =
         (json && json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content) || '';
       usage = json && json.usage
         ? { prompt: json.usage.prompt_tokens, completion: json.usage.completion_tokens }
         : undefined;
+
+      // 优先级2：Responses API 格式（output 数组，火山方舟新模型）
+      if (!text && json && Array.isArray(json.output)) {
+        text = extractResponsesText(json.output);
+        usage = json.usage
+          ? { prompt: json.usage.input_tokens || 0, completion: json.usage.output_tokens || 0 }
+          : usage;
+        logf('info', `检测到 Responses API 格式响应，提取 text 长度=${text.length}`);
+      }
+
+      // 优先级3：兼容豆包/其他厂商可能的 content 字符串格式
+      if (!text && json && typeof json.content === 'string') {
+        text = json.content;
+      }
+      // 优先级4：兼容 choices[0].content 字符串格式（部分老模型返回）
+      if (!text && json && json.choices && json.choices[0] && typeof json.choices[0].content === 'string') {
+        text = json.choices[0].content;
+      }
     }
     if (!text) {
-      logf('warn', `模型响应为空，原始响应体: ${JSON.stringify(json).slice(0, 500)}`);
+      // 完整打印原始响应体（不截断），便于排查豆包等厂商的非标准返回
+      const rawStr = JSON.stringify(json);
+      logf('error', `模型响应为空，HTTP status=${status}, 完整响应体长度=${rawStr.length}`);
+      logf('error', `完整响应体内容: ${rawStr}`);
       return { code: 1, message: '模型响应为空（HTTP 200 但内容体无 choices[0].message.content），请检查 baseURL / model 配置', data: null };
     }
     return { code: 0, message: 'ok', data: { text, usage } };

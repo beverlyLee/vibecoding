@@ -63,8 +63,6 @@ export default function HomePage() {
 
   const goProfile = () => Taro.switchTab({ url: '/pages/profile/index' });
 
-  const engineLabel = activeLLM ? `当前引擎：${activeLLM.name}` : '当前引擎：内置规则';
-
   return (
     <View className={styles.page}>
       {/* Hero 问候：头像与问候语横排 */}
@@ -100,13 +98,6 @@ export default function HomePage() {
             <Text className={styles.tipContent}>{tip.content}</Text>
           </View>
         ))}
-      </View>
-
-      {/* 引擎状态入口 */}
-      <View className={styles.enginePill} onClick={goProfile}>
-        <Text className={styles.enginePillText}>
-          {engineLabel} · 去「我的」可升级 AI 引擎 ›
-        </Text>
       </View>
 
       <Text className={styles.footerTip}>

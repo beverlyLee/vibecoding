@@ -50,9 +50,6 @@ export default function IntentCard({ result }: IntentCardProps) {
       </View>
       {result.situation && <Text className={styles.situation}>{result.situation}</Text>}
       <View className={styles.footer}>
-        <Text className={styles.sourceText}>
-          {sourceLabel(result.source)}
-        </Text>
         <Text className={styles.costText}>耗时 {(result.costMs / 1000).toFixed(1)}s</Text>
       </View>
     </View>

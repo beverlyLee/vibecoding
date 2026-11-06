@@ -16,7 +16,7 @@ function App(props) {
   // （initCloudConfig 内部直接调 Taro.cloud.database()，必须晚于 cloud.init，否则报错静默降级）
   useEffect(() => {
     if (process.env.TARO_ENV === 'weapp') {
-      Taro.cloud.init({ env: CLOUD_ENV, traceUser: true });
+      Taro.cloud.init({ env: CLOUD_ENV, traceUser: true, timeout: 60000 });
     }
     // 云环境初始化后再启动全局监控（保证 track 上报通道可用）
     initMonitor();

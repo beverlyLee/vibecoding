@@ -45,16 +45,20 @@ interface LLMAnalysisPayload {
 }
 
 // LLM 分析：意图识别 + 话术生成一次完成
-async function llmAnalyze(utterance: string): Promise<Omit<AnalysisResult, 'id' | 'costMs' | 'utterance'>> {
+// hintIntents 可选：规则层已命中的意图名，传给 LLM 做参考提示
+async function llmAnalyze(utterance: string, hintIntents?: string[]): Promise<Omit<AnalysisResult, 'id' | 'costMs' | 'utterance'>> {
   const cfg = useAppStore.getState().getActiveLLM();
   if (!cfg) throw new Error('未配置可用的大模型');
 
   const startTime = Date.now();
+  const hintText = hintIntents && hintIntents.length > 0
+    ? `\n【参考提示】根据关键词匹配，可能的意图是：${hintIntents.join('、')}。可以参考，但请以实际语境为准。`
+    : '';
   const raw = await chatCompletion(
     cfg,
     [
       { role: 'system', content: getPrompt('analyze') },
-      { role: 'user', content: `别人对我说的话：「${utterance}」` }
+      { role: 'user', content: `别人对我说的话：「${utterance}」${hintText}` }
     ],
     { tag: '拆招分析', ...getModelParams('analyze') }
   );
@@ -104,6 +108,42 @@ function countHits(text: string, keywords: string[]): number {
     if (kw && text.includes(kw)) hits += 1;
   }
   return hits;
+}
+
+/** 从原话中提取 3 个最重要的关键词，用于加入我的语录时自动填充 keywords 字段。
+ *  策略：按标点切分原话 → 每个片段去代词连词/语气助词 → 同时提取末尾 2-3 字短核心词 + 末尾 4-6 字短语 → 合并去重 → 挑 3 个。
+ *  例如原话「我像你这么大都赚了100w了，你连个工作都没有，天天在家啃老」→
+ *       ['啃老', '工作', '在家啃老', '100w', '赚了100w', '工作都没有'] → 挑 3 个 */
+export function extractKeywordsFromUtterance(utterance: string): string[] {
+  if (!utterance || utterance.trim().length < 2) return [];
+  const segments = utterance
+    .trim()
+    .split(/[，,。.!！?？、；;：:（）()]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 4 && /[\u4e00-\u9fa5]/.test(s));
+
+  const candidates = new Set<string>();
+  for (const seg of segments) {
+    let s = seg.replace(/^[我你他她它咱们大家但而如果既然即使因为所以虽然并且那这就也还又连]./, '');
+    s = s.replace(/[了啊呢呀嘛的吗吧呗喽啦]$/, '');
+    if (s.length < 2) continue;
+    // 末尾 2-3 字：短核心词（"啃老"、"100w"、"工作"）
+    if (s.length >= 2) candidates.add(s.slice(-2));
+    if (s.length >= 3) candidates.add(s.slice(-3));
+    // 末尾 4-6 字：完整短语（"在家啃老"、"工作都没有"、"赚了100w"）
+    if (s.length >= 4) candidates.add(s.slice(-Math.min(6, s.length)));
+  }
+  // 过滤无效：纯数字/纯语气词/万能否定词
+  const filtered = Array.from(candidates).filter((c) => {
+    if (!/[\u4e00-\u9fa5]/.test(c)) return false; // 必须含中文
+    if (/^[我你他她它咱们大家]$/.test(c)) return false;
+    // 万能否定/通用词：太泛，容易误命中
+    if (/^(没有|都没有|不行|不了|不是|不会|没了|不行|不对|不好|不行)$/.test(c)) return false;
+    return c.length >= 2;
+  });
+  // 去重后取前 3 个（优先短的核心词）
+  filtered.sort((a, b) => a.length - b.length);
+  return Array.from(new Set(filtered)).slice(0, 3);
 }
 
 // 通用评分候选（跨层复用）
@@ -165,14 +205,33 @@ function pickPrimaryRuleFromFixed(ranked: IntentCandidate[]): IntentRule {
 
 // 我的语录作为 L1 独立候选：每条语录按各自 keywords 打分，命中即视为该语录场景。
 // 权重 1.5（高于多数固定意图），让"自己的话术"在命中时优先于通用模板。
+// 如果语录没有 keywords（用户手动添加或加入 AI 回话时未设置），兜底用 content 做模糊匹配。
 function rankUserQuoteIntents(text: string): IntentCandidate[] {
   const userQuotes = getAllUserQuotes();
   if (!userQuotes.length) return [];
   const ranked: IntentCandidate[] = [];
   for (const q of userQuotes) {
     const keywords = q.keywords && q.keywords.length ? q.keywords : [];
-    if (!keywords.length) continue;
-    const hits = countHits(text, keywords);
+    let hits = keywords.length ? countHits(text, keywords) : 0;
+
+    // 兜底：没有 keywords 或 keywords 没命中时，用 content 做模糊匹配
+    if (hits === 0 && q.content) {
+      // 用户原话包含在语录 content 中（截取语录 content 的前 30 字做子串匹配）
+      const snippet = q.content.trim().slice(0, 30);
+      if (snippet.length >= 4 && text.includes(snippet)) {
+        hits = Math.max(1, Math.floor(snippet.length / 6));
+      } else {
+        // 反向：语录 content 里的关键词（按 2-6 字滑动窗口）在原话中出现
+        for (let i = 0; i + 4 <= snippet.length; i++) {
+          const gram = snippet.slice(i, i + 4);
+          if (gram.trim() && text.includes(gram)) {
+            hits = 1;
+            break;
+          }
+        }
+      }
+    }
+
     if (hits > 0) {
       ranked.push({
         name: q.category || '我的语录',
@@ -227,6 +286,11 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
   const startTime = Date.now();
 
   const cfg = useAppStore.getState().getActiveLLM();
+  const _settings = useAppStore.getState().settings;
+  const _global = useAppStore.getState().globalLLM;
+  logger.debug('[Engine] getActiveLLM →', cfg ? { key: cfg.key, useGlobal: cfg.useGlobal, baseURL: cfg.baseURL, model: cfg.model } : null,
+    '| settings.activeKey=', _settings?.activeKey,
+    '| globalLLM=', _global ? { id: _global.id, enabled: _global.enabled, name: _global.name } : null);
 
   // ========== 意图判定 L1：固定规则 ==========
   const fixedRanked = rankFixedIntents(text);
@@ -275,14 +339,28 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
   let source: AnalysisResult['source'];
 
   if (hasFixedHit) {
-    // === L1 命中 → 秒回用最高分的规则模板，不碰 L2/L3/LLM ===
+    // === L1 命中 → 用规则判定意图，但如果配了 LLM 就调 LLM 生成回话 ===
     const allRuleIntentNames = fixedRanked.map((r) => r.name);
-    logger.debug('[Engine] L1 命中 → 用「' + fixedRule.name + '」模板回话');
-    baseResult = ruleAnalyze(text, fixedRule, allRuleIntentNames);
-    source = 'rule';
+    if (cfg) {
+      logger.debug('[Engine] L1 命中 + 有 LLM → 用规则判定意图 + LLM 生成回话');
+      try {
+        baseResult = await llmAnalyze(text, allRuleIntentNames);
+        if (!baseResult.intent || baseResult.intent.length === 0) {
+          baseResult.intent = allRuleIntentNames;
+        }
+        source = 'llm';
+      } catch (err) {
+        logger.error('[Engine] L1+L3 LLM 失败, 降级规则模板:', err instanceof Error ? err.message : err);
+        baseResult = ruleAnalyze(text, fixedRule, allRuleIntentNames);
+        source = 'fallback';
+      }
+    } else {
+      logger.debug('[Engine] L1 命中 → 用「' + fixedRule.name + '」模板回话（无 LLM）');
+      baseResult = ruleAnalyze(text, fixedRule, allRuleIntentNames);
+      source = 'rule';
+    }
   } else if (hasDailyHit) {
-    // === L1 零命中 + L2 daily 命中 → 用 daily ===
-    // L2 层也不调 LLM，有 content 就追加当金句，没有就用 daily 的 intent_key 映射 generic 模板
+    // === L1 零命中 + L2 daily 命中 → 有 LLM 就调 LLM ===
     const l2IntentNames: string[] = [];
     for (const k of dailyMatches!.hitIntentKeys) {
       const mapped = getAllIntentRules().find((r) => r.key === k);
@@ -290,29 +368,31 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
     }
     if (l2IntentNames.length === 0) l2IntentNames.push('社区热语');
 
-    const dailyContents = dailyMatches!.matchedQuotes
-      .map((q) => q.content?.trim() || '')
-      .filter((c) => c.length >= 6);
-
-    if (dailyContents.length > 0) {
-      // daily 自带可用金句，追加到回话末尾
-      logger.debug('[Engine] L2 daily 命中 + 有 content → generic 模板 + daily 金句');
-      baseResult = ruleAnalyze(text, fixedRule, l2IntentNames);
-      source = 'rule';
-      // 把 daily 金句塞到 funnelHit 里，让后面的统一追加逻辑处理
-      if (!funnelHit) {
-        funnelHit = {
-          quotes: dailyMatches!.matchedQuotes.slice(0, 2),
-          hitLayer: 'daily',
-          costMs: 0,
-        };
+    if (cfg) {
+      logger.debug('[Engine] L2 daily 命中 + 有 LLM → LLM 生成回话');
+      try {
+        baseResult = await llmAnalyze(text, l2IntentNames);
+        if (!baseResult.intent || baseResult.intent.length === 0) {
+          baseResult.intent = l2IntentNames;
+        }
+        source = 'llm';
+      } catch (err) {
+        logger.error('[Engine] L2+L3 LLM 失败, 降级规则模板:', err instanceof Error ? err.message : err);
+        baseResult = ruleAnalyze(text, fixedRule, l2IntentNames);
+        source = 'fallback';
       }
-      funnelSourceTag = '🔥 社区热话';
     } else {
-      // daily 命中但内容空洞，还是 generic 模板，不调 LLM
-      logger.debug('[Engine] L2 daily 命中但 content 空洞 → generic 模板');
+      // 无 LLM：daily 自带可用金句就追加到回话末尾
       baseResult = ruleAnalyze(text, fixedRule, l2IntentNames);
       source = 'rule';
+      const dailyContents = dailyMatches!.matchedQuotes
+        .map((q) => q.content?.trim() || '')
+        .filter((c) => c.length >= 6);
+      if (dailyContents.length > 0) {
+        logger.debug('[Engine] L2 daily 命中 + 有 content + 无 LLM → 追加 daily 金句');
+      } else {
+        logger.debug('[Engine] L2 daily 命中但 content 空洞 + 无 LLM → generic 模板');
+      }
     }
   } else if (cfg) {
     // === L1+L2 均零命中 + 配了 LLM → L3 调 LLM（这是唯一调 LLM 的地方）===
@@ -360,13 +440,18 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
 
   // ========== 我的语录：独立检索，命中则在拆招页并行展示专属卡片 ==========
   // 不抢占主回话：正常意图判定流水线照常跑，这里额外查一遍「我的语录」库；
-  // 命中即随机挑一条作为专属卡片（多条命中随机显示一条），未命中则不展示。
-  let matchedUserQuote: Quote | null = null;
+  // 多条命中时按得分排序全部展示，让用户挑选最合适的。
   const userQuoteHits = rankUserQuoteIntents(text);
+  const matchedUserQuotes: Quote[] = [];
   if (userQuoteHits.length > 0) {
-    const pick = userQuoteHits[Math.floor(Math.random() * userQuoteHits.length)];
-    matchedUserQuote = getUserQuoteById(pick.intentKey.slice('user:'.length)) || null;
-    logger.debug(`[Engine] 我的语录命中 ${userQuoteHits.length} 条, 随机展示「${matchedUserQuote?.category || ''}」`);
+    // 按 score 降序取前 3 条，避免同时展示太多
+    userQuoteHits.sort((a, b) => b.score - a.score);
+    const top = userQuoteHits.slice(0, 3);
+    for (const hit of top) {
+      const q = getUserQuoteById(hit.intentKey.slice('user:'.length));
+      if (q) matchedUserQuotes.push(q);
+    }
+    logger.debug(`[Engine] 我的语录命中 ${userQuoteHits.length} 条, 展示前 ${matchedUserQuotes.length} 条`);
   } else {
     logger.debug('[Engine] 我的语录无命中 → 不展示卡片');
   }
@@ -374,7 +459,8 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
   return {
     ...baseResult,
     source: funnelSourceTag ? `rule_with_funnel_${funnelHit?.hitLayer}` as any : source,
-    userQuote: matchedUserQuote,
+    userQuotes: matchedUserQuotes,
+    userQuote: matchedUserQuotes[0] || null,
     id: `result_${Date.now()}`,
     utterance: text,
     costMs: Date.now() - startTime,
