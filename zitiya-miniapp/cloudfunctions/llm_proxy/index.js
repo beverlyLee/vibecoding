@@ -92,20 +92,33 @@ exports.main = async (event) => {
   let resolvedKey = apiKey;
   let resolvedModel = model;
 
-  // 全局模式：从云端 global_llm_config 读取密钥（key 不下发客户端，规避暴露）
+  // 全局模式：从云端 global_llm_config 读取密钥（多模型架构，取第一个 enabled 的；兼容旧单模型格式）
   if (useGlobal) {
     try {
       const docRes = await db.collection('global_llm_config').doc('default').get();
-      const g = docRes && docRes.data;
-      if (!g || !g.enabled || !g.apiKey || !g.baseURL || !g.model) {
+      const listDoc = docRes && docRes.data;
+      let g = null;
+      if (listDoc && Array.isArray(listDoc.items)) {
+        // 新格式：items 数组
+        g = listDoc.items.find((it) => it.enabled);
+      } else if (listDoc && listDoc.enabled && listDoc.apiKey && listDoc.baseURL && listDoc.model) {
+        // 旧格式兼容：根目录直接是配置字段
+        g = listDoc;
+      }
+      if (!g || !g.apiKey || !g.baseURL || !g.model) {
         return { code: 400, message: '全局模型未配置或未启用（请到管理后台配置全局模型）', data: null };
       }
       resolvedProtocol = g.protocol || 'openai';
       resolvedBase = g.baseURL;
       resolvedKey = g.apiKey;
       resolvedModel = g.model;
-      logf('info', `走全局模型配置: protocol=${resolvedProtocol} model=${resolvedModel}`);
+      logf('info', `走全局模型配置 id=${g.id || 'legacy'} protocol=${resolvedProtocol} model=${resolvedModel}`);
     } catch (e) {
+      const code = e && (e.errCode || e.code);
+      // 集合不存在 / 文档不存在 → 等价于未配置
+      if (code === -502005 || code === -1) {
+        return { code: 400, message: '全局模型未配置或未启用（请到管理后台配置全局模型）', data: null };
+      }
       return { code: 500, message: '读取全局模型配置失败: ' + (e && e.message || String(e)), data: null };
     }
   }
@@ -167,8 +180,8 @@ exports.main = async (event) => {
         : undefined;
     }
     if (!text) {
-      logf('warn', '模型响应为空');
-      return { code: 1, message: '模型响应为空', data: null };
+      logf('warn', `模型响应为空，原始响应体: ${JSON.stringify(json).slice(0, 500)}`);
+      return { code: 1, message: '模型响应为空（HTTP 200 但内容体无 choices[0].message.content），请检查 baseURL / model 配置', data: null };
     }
     return { code: 0, message: 'ok', data: { text, usage } };
   } catch (e) {

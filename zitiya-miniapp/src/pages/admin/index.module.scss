@@ -331,13 +331,23 @@
 .addBtn {
   margin: $spacing-sm 0;
   align-self: flex-start;
+  padding: 0 20rpx;
+  font-size: $font-size-xs;
 }
 
 .delMini {
   color: $color-error;
   border-color: #ffa39e;
   background: #fff1f0;
-  margin-left: auto;
+  padding: 0 20rpx;
+  font-size: $font-size-xs;
+}
+
+.cardAction {
+  font-size: $font-size-xs;
+  padding: 0 20rpx;
+  line-height: 1.8;
+  margin-left: 0;
 }
 
 .card {
@@ -389,8 +399,9 @@
 
 .row2 {
   display: flex;
-  gap: $spacing-md;
-  align-items: flex-start;
+  gap: 12rpx;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .row3 {

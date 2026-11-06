@@ -25,20 +25,33 @@ export interface LLMConfig {
   useGlobal?: boolean;
 }
 
-// 全局模型配置（管理后台统一配置，对所有用户生效）
+// 单个全局模型配置条目（管理后台统一配置，对所有用户生效）
+export interface GlobalLLMItem {
+  id: string;
+  enabled: boolean;
+  name: string;
+  protocol: LLMProtocol;
+  baseURL: string;
+  apiKey: string;
+  model: string;
+  asrModel?: string;
+  updatedAt?: number;
+}
+
+// 全局模型配置存储结构（一个文档存多个模型）
+export interface GlobalLLMList {
+  items: GlobalLLMItem[];
+}
+
 // 公开字段：客户端只读这些，不含 apiKey
 export interface GlobalLLMPublic {
+  id: string;
   enabled: boolean;
   name: string;
   protocol: LLMProtocol;
   baseURL: string;
   model: string;
   asrModel?: string;
-}
-
-// 全局模型配置全量（含 apiKey，仅管理后台可读写）
-export interface GlobalLLMConfig extends GlobalLLMPublic {
-  apiKey: string;
 }
 
 // 厂商预设（不含敏感信息）

@@ -20,9 +20,12 @@ import {
   adminSaveTopics,
 } from '@/services/adminConfig';
 import {
-  adminGetGlobalLLM,
-  adminSaveGlobalLLM,
+  adminListGlobalLLM,
+  adminSaveGlobalLLMItem,
+  adminToggleGlobalLLM,
+  adminRemoveGlobalLLM,
   adminTestGlobalLLM,
+  adminTestGlobalLLMWithConfig,
 } from '@/services/adminGlobalLLM';
 import {
   adminListDailyQuotes,
@@ -61,7 +64,7 @@ import { ATTACK_CATEGORIES, ATTACK_SCENES } from '@/data/attackScenes';
 import { INTENT_RULES } from '@/data/intents';
 import { QUOTES } from '@/data/quotes';
 import { LLM_PRESETS } from '@/types/settings';
-import type { GlobalLLMConfig } from '@/types/settings';
+import type { GlobalLLMItem } from '@/types/settings';
 import styles from './index.module.scss';
 
 const MODEL_PURPOSES = ['default', 'analyze', 'quoteGen', 'rephrase', 'test'];
@@ -1174,13 +1177,15 @@ function QuoteLibraryManagement({ isAdmin }: { isAdmin: boolean }) {
 }
 
 // ================================================================
-// 全局模型配置（管理后台统一配置，对所有用户生效）
+// 全局模型配置（多模型列表，每个独立启用/停用）
 // ================================================================
 function GlobalLLMManagement({ isAdmin }: { isAdmin: boolean }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [cfg, setCfg] = useState<GlobalLLMConfig>({
+  const [testingId, setTestingId] = useState<string | null>(null);
+  const [items, setItems] = useState<GlobalLLMItem[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Partial<GlobalLLMItem>>({
     enabled: false,
     name: '',
     protocol: 'openai',
@@ -1190,42 +1195,90 @@ function GlobalLLMManagement({ isAdmin }: { isAdmin: boolean }) {
     asrModel: '',
   });
 
-  useEffect(() => {
-    let alive = true;
+  // 加载列表
+  async function loadList() {
     setLoading(true);
-    adminGetGlobalLLM()
-      .then((data) => {
-        if (alive && data) {
-          setCfg({
-            enabled: !!data.enabled,
-            name: data.name || '',
-            protocol: data.protocol === 'anthropic' ? 'anthropic' : 'openai',
-            baseURL: data.baseURL || '',
-            apiKey: data.apiKey || '',
-            model: data.model || '',
-            asrModel: data.asrModel || '',
-          });
-        }
-      })
-      .catch((e: any) => Taro.showToast({ title: e?.message || '加载失败', icon: 'none' }))
-      .finally(() => {
-        if (alive) setLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
+    try {
+      const list = await adminListGlobalLLM();
+      setItems(list || []);
+    } catch (e: any) {
+      Taro.showToast({ title: e?.message || '加载失败', icon: 'none' });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function patch(p: Partial<GlobalLLMConfig>) {
-    setCfg((c) => ({ ...c, ...p }));
+  function startNew() {
+    setEditingId('__new__');
+    setDraft({
+      enabled: false,
+      name: '',
+      protocol: 'openai',
+      baseURL: '',
+      apiKey: '',
+      model: '',
+      asrModel: '',
+    });
   }
 
-  async function onSave() {
+  function startEdit(item: GlobalLLMItem) {
+    setEditingId(item.id);
+    setDraft({ ...item });
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setDraft({});
+  }
+
+  function patchDraft(p: Partial<GlobalLLMItem>) {
+    setDraft((d) => ({ ...d, ...p }));
+  }
+
+  async function onSaveItem() {
+    const d = draft;
+    if (!d.name?.trim()) {
+      Taro.showToast({ title: '请填写展示名称', icon: 'none' });
+      return;
+    }
+    if (d.enabled) {
+      if (!d.baseURL?.trim()) { Taro.showToast({ title: '启用需填写 baseURL', icon: 'none' }); return; }
+      if (!d.model?.trim()) { Taro.showToast({ title: '启用需填写 model', icon: 'none' }); return; }
+      // 如果是编辑已有条目且 apiKey 没改过，允许空（沿用旧值），但新增必须有
+      if (!d.apiKey?.trim() && editingId !== '__new__') {
+        // 编辑模式：apiKey 留空表示不修改，服务端会保留原 key
+      } else if (!d.apiKey?.trim()) {
+        Taro.showToast({ title: '启用需填写 API Key', icon: 'none' });
+        return;
+      }
+    }
     setSaving(true);
     try {
-      await adminSaveGlobalLLM(cfg);
-      Taro.showToast({ title: '全局模型已保存', icon: 'success' });
+      const itemToSave: any = {
+        id: editingId === '__new__' ? undefined : editingId || undefined,
+        enabled: d.enabled === true,
+        name: d.name?.trim() || '',
+        protocol: d.protocol || 'openai',
+        baseURL: d.baseURL?.trim() || '',
+        apiKey: d.apiKey || '',
+        model: d.model?.trim() || '',
+        asrModel: d.asrModel?.trim() || '',
+      };
+      const result = await adminSaveGlobalLLMItem(itemToSave);
+      Taro.showToast({ title: '已保存', icon: 'success' });
+      setEditingId(null);
+      setDraft({});
+      await loadList();
+      // 如果是新增，自动选中它进行编辑
+      if (editingId === '__new__') {
+        const savedItem = (await adminListGlobalLLM()).find((i) => i.id === result.id);
+        if (savedItem) startEdit(savedItem);
+      }
     } catch (e: any) {
       Taro.showToast({ title: e?.message || '保存失败', icon: 'none' });
     } finally {
@@ -1233,53 +1286,186 @@ function GlobalLLMManagement({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
-  async function onTest() {
-    setTesting(true);
+  async function onToggle(id: string) {
     try {
-      const r = await adminTestGlobalLLM();
+      await adminToggleGlobalLLM(id);
+      await loadList();
+    } catch (e: any) {
+      Taro.showToast({ title: e?.message || '操作失败', icon: 'none' });
+    }
+  }
+
+  async function onRemove(id: string) {
+    const ok = await new Promise<boolean>((res) => {
+      Taro.showModal({
+        title: '删除这个全局模型？',
+        content: '删除后所有用户不再使用此配置',
+        success: (r) => res(!!r.confirm),
+        fail: () => res(false),
+      });
+    });
+    if (!ok) return;
+    try {
+      await adminRemoveGlobalLLM(id);
+      if (editingId === id) {
+        setEditingId(null);
+        setDraft({});
+      }
+      await loadList();
+    } catch (e: any) {
+      Taro.showToast({ title: e?.message || '删除失败', icon: 'none' });
+    }
+  }
+
+  async function onTest(id?: string) {
+    setTestingId(id || '__any__');
+    try {
+      const r = await adminTestGlobalLLM(id);
       Taro.showToast({ title: r.message || '连接成功', icon: 'none' });
     } catch (e: any) {
       Taro.showToast({ title: e?.message || '测试失败', icon: 'none' });
     } finally {
-      setTesting(false);
+      setTestingId(null);
     }
   }
 
-  if (loading) return <Text className={styles.emptyTip}>加载中…</Text>;
+  if (loading && items.length === 0 && !editingId) {
+    return <Text className={styles.emptyTip}>加载中…</Text>;
+  }
+
+  const enabledCount = items.filter((i) => i.enabled).length;
+  const editingExisting = editingId && editingId !== '__new__';
+  const editingItem = editingExisting ? items.find((i) => i.id === editingId) : null;
 
   return (
     <View>
-      <SectionHeader title='全局模型配置' desc='配置一个全局生效的模型：所有用户在「我的」页未单独配置时自动复用，AI 能力开箱即用。API Key 仅存云端，不下发客户端。' />
-      <View className={styles.card}>
-        <View className={styles.cardHead}>
-          <Text className={styles.cardTitle}>启用全局模型</Text>
-          <Text
-            className={[styles.chip, cfg.enabled && styles.chipActive].filter(Boolean).join(' ')}
-            onClick={() => isAdmin && patch({ enabled: !cfg.enabled })}
-          >{cfg.enabled ? '已启用' : '已停用'}</Text>
+      <SectionHeader
+        title='全局模型配置'
+        desc={`已配置 ${items.length} 个模型，其中 ${enabledCount} 个启用。用户无个人配置时，自动复用第一个启用的。API Key 仅存云端。`}
+      />
+
+      {/* 模型列表 */}
+      {!editingId && (
+        <>
+          {isAdmin && (
+            <Button size='mini' className={styles.addBtn} onClick={startNew}>+ 新增模型</Button>
+          )}
+          {items.length === 0 && (
+            <Text className={styles.emptyTip}>暂无模型配置</Text>
+          )}
+          {items.map((item) => (
+            <View key={item.id} className={styles.card}>
+              <View className={styles.cardHead}>
+                <View className={styles.flex1}>
+                  <Text className={styles.cardTitle}>{item.name}</Text>
+                  <Text className={styles.metaTip}>
+                    {item.protocol} · {item.model}
+                  </Text>
+                </View>
+                <Text
+                  className={[styles.chip, item.enabled && styles.chipActive].filter(Boolean).join(' ')}
+                  onClick={() => isAdmin && onToggle(item.id)}
+                >
+                  {item.enabled ? '✓ 已启用' : '已停用'}
+                </Text>
+              </View>
+              <Text className={styles.metaTip}>{item.baseURL}</Text>
+              <View className={styles.cardHead}>
+                {isAdmin && (
+                  <View className={styles.row2}>
+                    <Button size='mini' className={styles.cardAction} onClick={() => startEdit(item)}>编辑</Button>
+                    <Button size='mini' className={styles.cardAction} loading={testingId === item.id} onClick={() => onTest(item.id)}>
+                      {testingId === item.id ? '测试中' : '测试'}
+                    </Button>
+                    <Button size='mini' className={[styles.cardAction, styles.delMini].join(' ')} onClick={() => onRemove(item.id)}>删除</Button>
+                  </View>
+                )}
+              </View>
+            </View>
+          ))}
+        </>
+      )}
+
+      {/* 新建 / 编辑表单 */}
+      {editingId && (
+        <View className={styles.card}>
+          {/* 顶部：标题 + 取消 + 醒目启用开关 */}
+          <View className={styles.cardHead}>
+            <View className={styles.flex1}>
+              <Text className={styles.cardTitle}>
+                {editingId === '__new__' ? '新增全局模型' : '编辑：' + (editingItem?.name || draft.name)}
+              </Text>
+              <View className={styles.cardHead}>
+                <Text className={styles.fieldLabel}>启用此模型</Text>
+                <Text
+                  className={[styles.chip, draft.enabled && styles.chipActive].filter(Boolean).join(' ')}
+                  onClick={() => patchDraft({ enabled: !draft.enabled })}
+                >{draft.enabled ? '✓ 已启用' : '已停用'}</Text>
+              </View>
+            </View>
+            <Button size='mini' onClick={cancelEdit}>取消</Button>
+          </View>
+          <Text className={styles.fieldLabel}>展示名称</Text>
+          <Input className={styles.inlineInput} value={draft.name || ''} placeholder='如：豆包默认模型'
+            onInput={(e) => patchDraft({ name: e.detail.value })} />
+          <Text className={styles.fieldLabel}>协议</Text>
+          <Picker mode='selector' range={PROTOCOLS} value={draft.protocol === 'anthropic' ? 1 : 0}
+            onChange={(e) => patchDraft({ protocol: PROTOCOLS[Number(e.detail.value)] as any })}>
+            <View className={styles.pickerBox}><Text>{draft.protocol}</Text></View>
+          </Picker>
+          <Text className={styles.fieldLabel}>baseURL</Text>
+          <Input className={styles.inlineInput} value={draft.baseURL || ''} placeholder='https://ark.cn-beijing.volces.com/api/v3'
+            onInput={(e) => patchDraft({ baseURL: e.detail.value })} />
+          <Text className={styles.fieldLabel}>model</Text>
+          <Input className={styles.inlineInput} value={draft.model || ''} placeholder='doubao-1-5-pro-32k-250115'
+            onInput={(e) => patchDraft({ model: e.detail.value })} />
+          <Text className={styles.fieldLabel}>API Key（仅存云端，编辑时留空表示不修改）</Text>
+          <Input className={styles.inlineInput} value={draft.apiKey || ''} placeholder='sk-...' password
+            onInput={(e) => patchDraft({ apiKey: e.detail.value })} />
+          <Text className={styles.fieldLabel}>语音识别模型（可选）</Text>
+          <Input className={styles.inlineInput} value={draft.asrModel || ''} placeholder='如：FunAudioLLM/SenseVoiceSmall'
+            onInput={(e) => patchDraft({ asrModel: e.detail.value })} />
+          {/* 底部：连接测试（小）+ 保存（全宽） */}
+          {isAdmin && (
+            <>
+              <Button
+                size='mini'
+                className={styles.cardAction}
+                loading={testingId === '__draft__'}
+                onClick={async () => {
+                  const baseItem = editingExisting ? items.find((i) => i.id === editingId) : null;
+                  const apiKey = draft.apiKey?.trim() || baseItem?.apiKey || '';
+                  const baseURL = draft.baseURL?.trim() || baseItem?.baseURL || '';
+                  const model = draft.model?.trim() || baseItem?.model || '';
+                  if (!baseURL || !apiKey || !model) {
+                    Taro.showToast({ title: '请先填 baseURL / API Key / model', icon: 'none' });
+                    return;
+                  }
+                  setTestingId('__draft__');
+                  try {
+                    const r = await adminTestGlobalLLMWithConfig({
+                      protocol: draft.protocol || baseItem?.protocol || 'openai',
+                      baseURL,
+                      apiKey,
+                      model,
+                    });
+                    Taro.showToast({ title: r.message || '连接成功', icon: 'none' });
+                  } catch (e: any) {
+                    Taro.showToast({ title: e?.message || '测试失败', icon: 'none' });
+                  } finally {
+                    setTestingId(null);
+                  }
+                }}
+              >
+                {testingId === '__draft__' ? '测试中' : '测试连接'}
+              </Button>
+              <Button className={styles.saveBtn} loading={saving} onClick={onSaveItem}>
+                {saving ? '保存中…' : '保存此模型'}
+              </Button>
+            </>
+          )}
         </View>
-        <Text className={styles.fieldLabel}>展示名称</Text>
-        <Input className={styles.inlineInput} value={cfg.name} placeholder='如：默认豆包模型' onInput={(e) => patch({ name: e.detail.value })} />
-        <Text className={styles.fieldLabel}>协议</Text>
-        <Picker mode='selector' range={PROTOCOLS} value={cfg.protocol === 'anthropic' ? 1 : 0}
-          onChange={(e) => patch({ protocol: PROTOCOLS[Number(e.detail.value)] as any })}>
-          <View className={styles.pickerBox}><Text>{cfg.protocol}</Text></View>
-        </Picker>
-        <Text className={styles.fieldLabel}>baseURL</Text>
-        <Input className={styles.inlineInput} value={cfg.baseURL} placeholder='https://ark.cn-beijing.volces.com/api/v3' onInput={(e) => patch({ baseURL: e.detail.value })} />
-        <Text className={styles.fieldLabel}>model</Text>
-        <Input className={styles.inlineInput} value={cfg.model} placeholder='doubao-1-5-pro-32k-250115' onInput={(e) => patch({ model: e.detail.value })} />
-        <Text className={styles.fieldLabel}>API Key（仅存云端）</Text>
-        <Input className={styles.inlineInput} value={cfg.apiKey} placeholder='sk-...' password onInput={(e) => patch({ apiKey: e.detail.value })} />
-        <Text className={styles.fieldLabel}>语音识别模型（可选）</Text>
-        <Input className={styles.inlineInput} value={cfg.asrModel} placeholder='如：FunAudioLLM/SenseVoiceSmall' onInput={(e) => patch({ asrModel: e.detail.value })} />
-        {isAdmin && (
-          <Button size='mini' className={styles.addBtn} loading={testing} onClick={onTest}>
-            {testing ? '测试中…' : '连接测试'}
-          </Button>
-        )}
-      </View>
-      <SaveBar isAdmin={isAdmin} saving={saving} onSave={onSave} />
+      )}
     </View>
   );
 }
