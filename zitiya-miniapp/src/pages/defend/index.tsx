@@ -26,6 +26,9 @@ function showSourceToast(source: string) {
     case 'fallback_no_llm':
       // 正常命中 / LLM 降级 / 规则库未匹配但无 LLM —— 全部静默，结果照展示
       break;
+    case 'quota_exceeded':
+      Taro.showToast({ title: '今日次数已用完，鸭鸭继续帮你拆招~', icon: 'none', duration: 2500 });
+      break;
   }
 }
 

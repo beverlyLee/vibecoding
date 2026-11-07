@@ -71,6 +71,7 @@ export interface CloudSceneConfig {
   crawl_topics?: string[];
   daily_quote_limit?: number;
   daily_quote_ttl_days?: number;
+  llm_daily_limit?: number;
   api_base?: string;
   prompts?: PromptsMap;
   model_params?: ModelParamsMap;
@@ -86,6 +87,7 @@ export type ConfigSection =
   | 'crawl_topics'
   | 'daily_quote_limit'
   | 'daily_quote_ttl_days'
+  | 'llm_daily_limit'
   | 'api_base'
   | 'prompts'
   | 'model_params'

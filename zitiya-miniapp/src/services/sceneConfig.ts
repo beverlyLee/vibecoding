@@ -44,48 +44,91 @@ interface CloudSceneConfig {
 // 云端配置缓存 + 加载状态
 let _cloudConfig: CloudSceneConfig | null = null;
 let _cloudLoadPromise: Promise<void> | null = null;
+let _cloudFetched = false;  // ← 标记"已经从云端拉过了（不管有没有数据）"
+const STORAGE_KEY = 'zuitiya_cloud_config';
+
+/** 同步从 Storage 读（有就用，没就 null） */
+function loadFromStorage(): CloudSceneConfig | null {
+  try {
+    const raw = Taro.getStorageSync(STORAGE_KEY);
+    if (raw && typeof raw === 'object') {
+      logger.debug('[SceneConfig] 📦 命中本地 Storage 缓存');
+      return raw as CloudSceneConfig;
+    }
+  } catch { /* 忽略 */ }
+  return null;
+}
+
+/** 同步写 Storage */
+function saveToStorage(data: CloudSceneConfig): void {
+  try {
+    Taro.setStorageSync(STORAGE_KEY, data);
+  } catch { /* 忽略 */ }
+}
 
 /**
- * 启动时调一次：从云数据库 scene_config.doc('main') 加载全量配置
- * 只有微信小程序环境有 wx.cloud，H5 跳过（用代码默认值）
- * 失败不阻塞，继续用代码默认值
+ * 同步初始化：先尝试从 Storage 读（秒级），同时异步后台拉云端覆盖
+ * analyzeUtterance 里的 await initCloudConfig() 会：
+ *   - 如果有 Storage 缓存 → 立刻 resolve（不阻塞）
+ *   - 如果没有 → 等云端拉完（第一次会等，但只等这一次）
  */
 export function initCloudConfig(): Promise<void> {
-  if (_cloudConfig) return Promise.resolve();
+  if (_cloudFetched) return Promise.resolve();
+
+  // 第一步：同步从 Storage 读，有就立刻用，不阻塞 analyzeUtterance
+  const cached = loadFromStorage();
+  if (cached) {
+    _cloudConfig = cached;
+    _cloudFetched = true;  // Storage 里有数据就可以认为"已经拉过了"
+  }
+
+  // 第二步：异步后台从云端拉最新（即使有 Storage 也拉，保证管理后台改了能同步）
   if (_cloudLoadPromise) return _cloudLoadPromise;
 
   _cloudLoadPromise = (async () => {
     try {
-      // 小程序：读云数据库 scene_config.doc('main')
       if (process.env.TARO_ENV === 'weapp' && typeof Taro !== 'undefined' && Taro.cloud) {
         const db = Taro.cloud.database();
         const res = await db.collection('scene_config').doc('main').get();
         const data = res.data as CloudSceneConfig;
-        if (data && (data.intents?.length || data.fixed_quotes?.length)) {
+        if (data) {
           _cloudConfig = data;
-          logger.debug('[SceneConfig] ✅ 云端配置加载:',
-            (data.intents?.length || 0), '个意图,',
-            (data.fixed_quotes?.length || 0), '条语录,',
-            (data.crawl_topics?.length || 0), '个话题'
-          );
-          return;
+          saveToStorage(data);  // ← 持久化到本地
+          logger.debug('[SceneConfig] ✅ 云端配置拉取完成并持久化:',
+            (data?.intents?.length || 0), '个意图,',
+            (data?.fixed_quotes?.length || 0), '条语录,',
+            (data?.prompts ? Object.keys(data.prompts).length : 0), '个提示词');
+        } else if (!_cloudConfig) {
+          _cloudConfig = null;
         }
       }
-      // H5 或小程序云数据没配 → 用代码默认
-      logger.debug('[SceneConfig] 使用代码默认配置');
-      _cloudConfig = null;
     } catch (err: any) {
-      logger.warn('[SceneConfig] 云端加载失败（用默认值）:', err?.message || err);
-      _cloudConfig = null;
+      if (!_cloudConfig) {
+        logger.warn('[SceneConfig] 云端加载失败（用默认值）:', err?.message || err);
+      }
+    } finally {
+      _cloudFetched = true;
+      _cloudLoadPromise = null;
     }
   })();
 
-  return _cloudLoadPromise;
+  // 如果 Storage 有数据 → 立刻返回 resolved Promise（analyzeUtterance 不阻塞）
+  // 如果 Storage 也空 → 返回云端请求（第一次会等，但只等这一次）
+  return cached ? Promise.resolve() : _cloudLoadPromise;
 }
 
 /** 当前是否已从云端加载到配置 */
 export function isCloudConfigLoaded(): boolean {
   return _cloudConfig !== null;
+}
+
+/** 管理后台保存配置后调用，让下次 get 强制从云端重拉 */
+export function invalidateCloudConfig(): void {
+  _cloudConfig = null;
+  _cloudLoadPromise = null;
+  _cloudFetched = false;
+  try { Taro.removeStorageSync(STORAGE_KEY); } catch { /* 忽略 */ }
+  logger.debug('[SceneConfig] 云端配置缓存已失效（含本地 Storage）');
 }
 
 // 用户可覆盖/新增的数据结构
@@ -168,6 +211,9 @@ export const DEFAULT_MODEL_PARAMS: Record<string, { temperature: number; maxToke
 };
 
 export const DEFAULT_DAILY_TTL_DAYS = 7;
+
+/** 每日 LLM 调用次数上限（普通用户）；0 或负数 = 不限 */
+export const DEFAULT_LLM_DAILY_LIMIT = 5;
 
 // 后端 API 基地址（FastAPI 数据服务器）默认值
 export const DEFAULT_API_BASE = 'http://localhost:8080';

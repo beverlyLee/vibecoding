@@ -277,12 +277,7 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
   logger.debug('[API] engine.analyzeUtterance ← 入口, 输入', utterance.trim().length, '字');
   const text = utterance.trim();
   if (!text) throw new Error('输入为空');
-  // 确保云端场景配置（意图集/语录集）已加载，避免冷启动竞态导致不同设备结果不一致
-  await initCloudConfig();
-  // 先确保用户语录已加载（未登录降级空数组，不阻塞）
-  await initUserQuotes();
-  // 加载全局模型配置（管理后台统一配置，无个人配置时引擎走全局模型）
-  await useAppStore.getState().initGlobalLLM();
+  // 配置已在 app.tsx 启动时同步初始化完，这里直接用（不再 await）
   const startTime = Date.now();
 
   const cfg = useAppStore.getState().getActiveLLM();
@@ -339,26 +334,10 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
   let source: AnalysisResult['source'];
 
   if (hasFixedHit) {
-    // === L1 命中 → 用规则判定意图，但如果配了 LLM 就调 LLM 生成回话 ===
-    const allRuleIntentNames = fixedRanked.map((r) => r.name);
-    if (cfg) {
-      logger.debug('[Engine] L1 命中 + 有 LLM → 用规则判定意图 + LLM 生成回话');
-      try {
-        baseResult = await llmAnalyze(text, allRuleIntentNames);
-        if (!baseResult.intent || baseResult.intent.length === 0) {
-          baseResult.intent = allRuleIntentNames;
-        }
-        source = 'llm';
-      } catch (err) {
-        logger.error('[Engine] L1+L3 LLM 失败, 降级规则模板:', err instanceof Error ? err.message : err);
-        baseResult = ruleAnalyze(text, fixedRule, allRuleIntentNames);
-        source = 'fallback';
-      }
-    } else {
-      logger.debug('[Engine] L1 命中 → 用「' + fixedRule.name + '」模板回话（无 LLM）');
-      baseResult = ruleAnalyze(text, fixedRule, allRuleIntentNames);
-      source = 'rule';
-    }
+    // === L1 固定规则命中 → 直接用规则模板回话（短路，不调 LLM）===
+    logger.debug(`[Engine] ⚡ L1 固定规则命中 (${fixedRule.name}) → 规则模板回话, 耗时 ${Date.now() - startTime}ms`);
+    baseResult = ruleAnalyze(text, fixedRule, fixedRanked.map((r) => r.name));
+    source = 'rule';
   } else if (hasDailyHit) {
     // === L1 零命中 + L2 daily 命中 → 有 LLM 就调 LLM ===
     const l2IntentNames: string[] = [];
@@ -369,13 +348,14 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
     if (l2IntentNames.length === 0) l2IntentNames.push('社区热语');
 
     if (cfg) {
-      logger.debug('[Engine] L2 daily 命中 + 有 LLM → LLM 生成回话');
+      logger.debug(`[Engine] L2 daily 命中 + 有 LLM → LLM 生成回话, 已耗时 ${Date.now() - startTime}ms`);
       try {
         baseResult = await llmAnalyze(text, l2IntentNames);
         if (!baseResult.intent || baseResult.intent.length === 0) {
           baseResult.intent = l2IntentNames;
         }
         source = 'llm';
+        logger.debug(`[Engine] L2+L3 LLM 完成, 总耗时 ${Date.now() - startTime}ms`);
       } catch (err) {
         logger.error('[Engine] L2+L3 LLM 失败, 降级规则模板:', err instanceof Error ? err.message : err);
         baseResult = ruleAnalyze(text, fixedRule, l2IntentNames);
@@ -396,17 +376,26 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
     }
   } else if (cfg) {
     // === L1+L2 均零命中 + 配了 LLM → L3 调 LLM（这是唯一调 LLM 的地方）===
-    logger.debug('[Engine] L1+L2 均无命中 + 有 LLM → L3 调大模型');
+    logger.debug(`[Engine] L1+L2 均无命中 + 有 LLM → L3 调大模型, 已耗时 ${Date.now() - startTime}ms`);
     try {
       baseResult = await llmAnalyze(text);
       if (!baseResult.intent || baseResult.intent.length === 0) {
         baseResult.intent = ['未识别场景'];
       }
       source = 'llm';
-    } catch (err) {
-      logger.error('[Engine] L3 LLM 失败, 降级万能兜底:', err instanceof Error ? err.message : err);
-      baseResult = ruleAnalyze(text, fixedRule, ['未识别场景']);
-      source = 'fallback';
+      logger.debug(`[Engine] L3 LLM 完成, 总耗时 ${Date.now() - startTime}ms`);
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      // 429 次数超限：降级兜底，但把错误信息透给 UI 做提示
+      if (msg.includes('429') || msg.includes('已用完')) {
+        logger.warn('[Engine] LLM 次数已用完, 降级万能兜底:', msg);
+        baseResult = ruleAnalyze(text, fixedRule, ['未识别场景']);
+        source = 'quota_exceeded';
+      } else {
+        logger.error('[Engine] L3 LLM 失败, 降级万能兜底:', msg);
+        baseResult = ruleAnalyze(text, fixedRule, ['未识别场景']);
+        source = 'fallback';
+      }
     }
   } else {
     // === L1+L2 均零命中 + 没配 LLM → 真兜底（source 标明是没配 LLM）===
@@ -456,6 +445,8 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
     logger.debug('[Engine] 我的语录无命中 → 不展示卡片');
   }
 
+  const totalMs = Date.now() - startTime;
+  logger.debug(`[Engine] ✅ analyzeUtterance 完成, source=${source}, 总耗时 ${totalMs}ms`);
   return {
     ...baseResult,
     source: funnelSourceTag ? `rule_with_funnel_${funnelHit?.hitLayer}` as any : source,
@@ -463,7 +454,7 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
     userQuote: matchedUserQuotes[0] || null,
     id: `result_${Date.now()}`,
     utterance: text,
-    costMs: Date.now() - startTime,
+    costMs: totalMs,
   };
 }
 

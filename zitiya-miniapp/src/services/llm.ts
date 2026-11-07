@@ -113,12 +113,31 @@ export async function chatCompletion(cfg: LLMConfig, messages: ChatMessage[], op
   const tag = opts.tag || '对话';
   const start = Date.now();
   const promptChars = messages.reduce((n, m) => n + (m.content?.length || 0), 0);
-  logger.debug(`[LLM] → 请求 ${cfg.name}/${cfg.model} [${tag}] ${messages.length}条消息 ${promptChars}字`);
+
+  // ========== 详细输入日志 ==========
+  logger.info(`━━━━━━ LLM 请求 [${tag}] ━━━━━━`);
+  logger.info(`  模型: ${cfg.name}/${cfg.model}  协议: ${cfg.protocol || 'openai'}  baseURL: ${cfg.baseURL}`);
+  logger.info(`  参数: temperature=${temperature}  maxTokens=${maxTokens}  timeout=${timeout}ms`);
+  logger.info(`  消息数: ${messages.length}  总字符: ${promptChars}`);
+  messages.forEach((m, i) => {
+    logger.info(`  [${i}] ${m.role}: ${String(m.content).slice(0, 200)}${String(m.content).length > 200 ? '...(+' + (String(m.content).length - 200) + '字)' : ''}`);
+  });
+  logger.info(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
 
   try {
     const reply = cfg.protocol === 'anthropic'
       ? await callAnthropic(cfg, messages, { temperature, maxTokens, timeout })
       : await callOpenAI(cfg, messages, { temperature, maxTokens, timeout });
+
+    // ========== 详细输出日志 ==========
+    const cost = Date.now() - start;
+    logger.info(`━━━━━━ LLM 响应 [${tag}] ✅ ${cost}ms ━━━━━━`);
+    logger.info(`  回复: ${reply.text}`);
+    if (reply.usage) {
+      logger.info(`  Token: prompt=${reply.usage.prompt || '?'}  completion=${reply.usage.completion || '?'}`);
+    }
+    logger.info(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+
     recordLLMCall({
       time: nowTime(),
       tag,
@@ -126,7 +145,7 @@ export async function chatCompletion(cfg: LLMConfig, messages: ChatMessage[], op
       model: cfg.model,
       protocol: cfg.protocol || 'openai',
       ok: true,
-      latencyMs: Date.now() - start,
+      latencyMs: cost,
       promptChars,
       replyChars: reply.text.length,
       tokens: reply.usage,
@@ -134,7 +153,14 @@ export async function chatCompletion(cfg: LLMConfig, messages: ChatMessage[], op
     });
     return reply.text;
   } catch (err) {
+    const cost = Date.now() - start;
     const msg = err instanceof Error ? err.message : String(err);
+
+    // ========== 错误日志 ==========
+    logger.error(`━━━━━━ LLM 响应 [${tag}] ❌ ${cost}ms ━━━━━━`);
+    logger.error(`  错误: ${msg}`);
+    logger.error(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+
     recordLLMCall({
       time: nowTime(),
       tag,
@@ -142,7 +168,7 @@ export async function chatCompletion(cfg: LLMConfig, messages: ChatMessage[], op
       model: cfg.model,
       protocol: cfg.protocol || 'openai',
       ok: false,
-      latencyMs: Date.now() - start,
+      latencyMs: cost,
       promptChars,
       replyChars: 0,
       message: msg

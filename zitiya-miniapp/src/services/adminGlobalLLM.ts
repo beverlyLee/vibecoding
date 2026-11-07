@@ -5,6 +5,7 @@
 import Taro from '@tarojs/taro';
 import type { CloudFuncResp } from '@/types/user';
 import type { GlobalLLMItem, GlobalLLMPublic } from '@/types/settings';
+import { useAppStore } from '@/store/useAppStore';
 
 const FUNC = 'admin_global_llm';
 
@@ -37,17 +38,26 @@ export function adminListGlobalLLM(): Promise<GlobalLLMItem[]> {
 
 // 管理后台：新增或更新一个条目（按 id upsert），admin 可调用
 export function adminSaveGlobalLLMItem(item: Partial<GlobalLLMItem> & { name: string; protocol: string; baseURL: string; model: string }): Promise<{ id: string }> {
-  return call<{ id: string }>('saveItem', { value: item });
+  return call<{ id: string }>('saveItem', { value: item }).then((res) => {
+    useAppStore.getState().invalidateGlobalLLM();
+    return res;
+  });
 }
 
 // 管理后台：切换某个条目的 enabled，admin 可调用
 export function adminToggleGlobalLLM(id: string): Promise<{ enabled: boolean }> {
-  return call<{ enabled: boolean }>('toggle', { id });
+  return call<{ enabled: boolean }>('toggle', { id }).then((res) => {
+    useAppStore.getState().invalidateGlobalLLM();
+    return res;
+  });
 }
 
 // 管理后台：删除某个条目，admin 可调用
 export function adminRemoveGlobalLLM(id: string): Promise<null> {
-  return call<null>('remove', { id });
+  return call<null>('remove', { id }).then((res) => {
+    useAppStore.getState().invalidateGlobalLLM();
+    return res;
+  });
 }
 
 // 管理后台：实测指定条目或第一个 enabled 的连接是否可用，admin 可调用

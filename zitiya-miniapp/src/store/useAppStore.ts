@@ -17,6 +17,8 @@ interface AppState {
   init: () => void;
   // 拉取全局模型公开配置（带缓存），失败降级为 null
   initGlobalLLM: () => Promise<void>;
+  // 让下次 initGlobalLLM 强制重拉（管理后台保存后调）
+  invalidateGlobalLLM: () => void;
   // 保存单个厂商配置
   saveLLMConfig: (cfg: LLMConfig) => void;
   // 切换启用的语言处理模型（传空串表示仅用内置规则）
@@ -156,20 +158,43 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   initGlobalLLM: () => {
-    // 每次强制刷新：避免首次启动时集合还不存在导致 null 被永久缓存
+    if (_globalLLMLoaded) return Promise.resolve();  // ← 已加载过就秒回（内存缓存）
+
+    // 先同步读 Storage，有就立刻用（不阻塞 analyzeUtterance）
+    const STORAGE_KEY = 'zuitiya_global_llm';
+    let cached: GlobalLLMPublic | null = null;
+    try {
+      const raw = Taro.getStorageSync(STORAGE_KEY);
+      if (raw && typeof raw === 'object') {
+        cached = raw as GlobalLLMPublic;
+        set({ globalLLM: cached });
+        _globalLLMLoaded = true;
+      }
+    } catch { /* 忽略 */ }
+
     if (_globalLLMPromise) return _globalLLMPromise;
     _globalLLMPromise = (async () => {
       try {
         const pub = await getGlobalLLMPublic();
         set({ globalLLM: pub });
+        // 持久化到 Storage
+        try { Taro.setStorageSync(STORAGE_KEY, pub); } catch { /* 忽略 */ }
       } catch (e) {
-        set({ globalLLM: null });
+        // 云端失败就保留 Storage 里的旧值（不强制清）
       } finally {
         _globalLLMLoaded = true;
         _globalLLMPromise = null;
       }
     })();
-    return _globalLLMPromise;
+
+    return cached ? Promise.resolve() : _globalLLMPromise;
+  },
+
+  invalidateGlobalLLM: () => {
+    _globalLLMLoaded = false;
+    _globalLLMPromise = null;
+    set({ globalLLM: null });
+    try { Taro.removeStorageSync('zuitiya_global_llm'); } catch { /* 忽略 */ }
   },
 
   setPendingQuote: (text) => set({ pendingQuote: text }),

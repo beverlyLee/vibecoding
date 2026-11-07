@@ -494,7 +494,7 @@ export const INTENT_RULES: IntentRule[] = [
   },
   {
     key: 'generic',
-    name: '万能兜底',
+    name: '没太听懂',
     keywords: [],
     weight: 0,
     intensity: 'low',

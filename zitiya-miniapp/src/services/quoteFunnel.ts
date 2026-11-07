@@ -49,9 +49,7 @@ export async function funnelForEngine(
   intentKey?: string
 ): Promise<FunnelResult | null> {
   const start = Date.now();
-
-  // 确保用户语录已加载（未登录会降级为空数组，不阻塞）
-  await initUserQuotes();
+  // 用户语录已在 app.tsx 启动时初始化完，不再 await
 
   // Layer 1: 固定库 + 用户自建语录，合并匹配不区分来源
   const fixedList = getAllFixedQuotes();

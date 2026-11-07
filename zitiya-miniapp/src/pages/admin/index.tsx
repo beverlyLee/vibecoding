@@ -4,14 +4,12 @@ import Taro, { useDidShow } from '@tarojs/taro';
 import { useUserStore } from '@/store/useUserStore';
 import UserManagement from './UserManagement';
 import {
-  ApiBaseManagement,
   AttackCategoryManagement,
   AttackSceneManagement,
   DailyManagement,
   GlobalLLMManagement,
   IntentManagement,
   ModelParamsManagement,
-  PresetManagement,
   PromptManagement,
   QuoteLibraryManagement,
   TopicManagement,
@@ -20,7 +18,7 @@ import styles from './index.module.scss';
 
 type TabKey =
   | 'quotes' | 'users' | 'intents' | 'topics' | 'model'
-  | 'daily' | 'apibase' | 'attack' | 'attackcat' | 'presets' | 'prompts' | 'globalllm';
+  | 'daily' | 'attack' | 'attackcat' | 'prompts' | 'globalllm';
 
 type TabItem =
   | { kind: 'label'; label: string }
@@ -36,10 +34,8 @@ const TABS: TabItem[] = [
   { kind: 'tab', key: 'topics', label: '话题管理' },
   { kind: 'tab', key: 'model', label: '模型参数' },
   { kind: 'tab', key: 'daily', label: '每日参数' },
-  { kind: 'tab', key: 'apibase', label: '后端地址' },
   { kind: 'tab', key: 'attack', label: '出招场景' },
   { kind: 'tab', key: 'attackcat', label: '出招分类' },
-  { kind: 'tab', key: 'presets', label: 'LLM预设' },
   { kind: 'tab', key: 'prompts', label: '提示词' },
   { kind: 'tab', key: 'globalllm', label: '全局模型' },
 ];
@@ -80,10 +76,8 @@ export default function AdminPage() {
     case 'topics': return <TopicManagement isAdmin={isAdmin} />;
       case 'model': return <ModelParamsManagement isAdmin={isAdmin} />;
       case 'daily': return <DailyManagement isAdmin={isAdmin} />;
-      case 'apibase': return <ApiBaseManagement isAdmin={isAdmin} />;
       case 'attack': return <AttackSceneManagement isAdmin={isAdmin} />;
       case 'attackcat': return <AttackCategoryManagement isAdmin={isAdmin} />;
-      case 'presets': return <PresetManagement isAdmin={isAdmin} />;
       case 'prompts': return <PromptManagement isAdmin={isAdmin} />;
       case 'globalllm': return <GlobalLLMManagement isAdmin={isAdmin} />;
       default: return <QuoteLibraryManagement isAdmin={isAdmin} />;

@@ -5,18 +5,7 @@ import { INTENSITY_META } from '@/types/analysis';
 import styles from './index.module.scss';
 
 interface IntentCardProps {
-  result: Pick<AnalysisResult, 'intent' | 'intensity' | 'situation' | 'source' | 'costMs'>;
-}
-
-function sourceLabel(source: string): string {
-  switch (source) {
-    case 'llm': return '🧠 大模型分析';
-    case 'rule': return '🦆 内置规则';
-    case 'user_quote': return '✨ 我的语录';
-    case 'fallback': return '🛟 兜底（AI 暂不可用）';
-    case 'fallback_no_llm': return '🛟 兜底（未配置大模型）';
-    default: return '🦆 内置规则';
-  }
+  result: Pick<AnalysisResult, 'intent' | 'intensity' | 'situation' | 'costMs'>;
 }
 
 // 意图识别结果卡

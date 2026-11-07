@@ -7,14 +7,13 @@ import { View, Text, Input, Textarea, Button, Picker, ScrollView, Switch } from 
 import Taro from '@tarojs/taro';
 import {
   adminGetConfig,
-  adminSaveApiBase,
   adminSaveAttackCategories,
   adminSaveAttackScenes,
   adminSaveDailyLimit,
   adminSaveDailyTTL,
   adminSaveIntents,
+  adminSaveLLMDailyLimit,
   adminSaveModelParams,
-  adminSavePresets,
   adminSavePrompts,
   adminSaveQuotes,
   adminSaveTopics,
@@ -58,12 +57,11 @@ import {
   DEFAULT_CRAWL_TOPICS,
   DEFAULT_MODEL_PARAMS,
   DEFAULT_DAILY_TTL_DAYS,
-  DEFAULT_API_BASE,
+  DEFAULT_LLM_DAILY_LIMIT,
 } from '@/services/sceneConfig';
 import { ATTACK_CATEGORIES, ATTACK_SCENES } from '@/data/attackScenes';
 import { INTENT_RULES } from '@/data/intents';
 import { QUOTES } from '@/data/quotes';
-import { LLM_PRESETS } from '@/types/settings';
 import type { GlobalLLMItem } from '@/types/settings';
 import styles from './index.module.scss';
 
@@ -468,6 +466,7 @@ function ModelParamsManagement({ isAdmin }: { isAdmin: boolean }) {
 function DailyManagement({ isAdmin }: { isAdmin: boolean }) {
   const limitHook = useConfig<number>((c) => c.daily_quote_limit, 12);
   const ttlHook = useConfig<number>((c) => c.daily_quote_ttl_days, DEFAULT_DAILY_TTL_DAYS);
+  const llmLimitHook = useConfig<number>((c) => c.llm_daily_limit, DEFAULT_LLM_DAILY_LIMIT);
   const [saving, setSaving] = useState(false);
 
   async function onSave() {
@@ -476,6 +475,7 @@ function DailyManagement({ isAdmin }: { isAdmin: boolean }) {
       await Promise.all([
         adminSaveDailyLimit(limitHook.value),
         adminSaveDailyTTL(ttlHook.value),
+        adminSaveLLMDailyLimit(llmLimitHook.value),
       ]);
       Taro.showToast({ title: '每日参数已保存', icon: 'success' });
     } catch (e: any) {
@@ -485,11 +485,11 @@ function DailyManagement({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
-  if (limitHook.loading || ttlHook.loading) return <Text className={styles.emptyTip}>加载中…</Text>;
+  if (limitHook.loading || ttlHook.loading || llmLimitHook.loading) return <Text className={styles.emptyTip}>加载中…</Text>;
 
   return (
     <View>
-      <SectionHeader title='每日参数' desc='控制云函数 daily_crawler 每天从语料池入库上限（默认 12）与语录缓存过期天数。' />
+      <SectionHeader title='每日参数' desc='控制云函数 daily_crawler 每天从语料池入库上限、语录缓存过期天数、以及 LLM 每日调用次数上限。' />
       <View className={styles.card}>
         <Text className={styles.fieldLabel}>每日入库上限（条，默认 12）</Text>
         <Input className={styles.inlineInput} type='digit' value={String(limitHook.value)}
@@ -497,35 +497,9 @@ function DailyManagement({ isAdmin }: { isAdmin: boolean }) {
         <Text className={styles.fieldLabel}>语录缓存 TTL（天，默认 7，1~30）</Text>
         <Input className={styles.inlineInput} type='digit' value={String(ttlHook.value)}
           onInput={(e) => ttlHook.setValue(Number(e.detail.value) || 0)} />
-      </View>
-      <SaveBar isAdmin={isAdmin} saving={saving} onSave={onSave} />
-    </View>
-  );
-}
-
-// ================================================================
-// 后端地址
-// ================================================================
-function ApiBaseManagement({ isAdmin }: { isAdmin: boolean }) {
-  const { value, setValue, loading, saving, setSaving } = useConfig<string>((c) => c.api_base, DEFAULT_API_BASE);
-  async function onSave() {
-    setSaving(true);
-    try {
-      await adminSaveApiBase(value.trim());
-      Taro.showToast({ title: '后端地址已保存', icon: 'success' });
-    } catch (e: any) {
-      Taro.showToast({ title: e?.message || '保存失败', icon: 'none' });
-    } finally {
-      setSaving(false);
-    }
-  }
-  if (loading) return <Text className={styles.emptyTip}>加载中…</Text>;
-  return (
-    <View>
-      <SectionHeader title='后端地址' desc='小程序/H5 数据链路打这个地址（FastAPI :8080）。公网部署填 https 地址。' />
-      <View className={styles.card}>
-        <Input className={styles.inlineInput} value={value} placeholder='http://localhost:8080'
-          onInput={(e) => setValue(e.detail.value)} />
+        <Text className={styles.fieldLabel}>LLM 每日调用上限（次，默认 5；0 或负数 = 不限，后续会员扩展）</Text>
+        <Input className={styles.inlineInput} type='digit' value={String(llmLimitHook.value)}
+          onInput={(e) => llmLimitHook.setValue(Number(e.detail.value) || 0)} />
       </View>
       <SaveBar isAdmin={isAdmin} saving={saving} onSave={onSave} />
     </View>
@@ -656,81 +630,6 @@ function AttackCategoryManagement({ isAdmin }: { isAdmin: boolean }) {
           <Text key={c} className={styles.chipClosable} onClick={() => removeCat(c)}>{c} ✕</Text>
         ))}
       </View>
-      <SaveBar isAdmin={isAdmin} saving={saving} onSave={onSave} />
-    </View>
-  );
-}
-
-// ================================================================
-// LLM 预设
-// ================================================================
-function PresetManagement({ isAdmin }: { isAdmin: boolean }) {
-  const { value, setValue, loading, saving, setSaving } = useConfig<LLMPreset[]>((c) => c.presets, LLM_PRESETS as LLMPreset[]);
-
-  function updatePreset(idx: number, patch: Partial<LLMPreset>) {
-    setValue(value.map((p, i) => (i === idx ? { ...p, ...patch } : p)));
-  }
-  function addPreset() {
-    const newPreset: LLMPreset = {
-      key: `custom_${Date.now()}`,
-      name: '新预设',
-      protocol: 'openai',
-      baseURL: '',
-      model: '',
-      keyUrl: '',
-      note: '',
-    };
-    setValue([...value, newPreset]);
-  }
-  function removePreset(idx: number) {
-    setValue(value.filter((_, i) => i !== idx));
-  }
-  async function onSave() {
-    setSaving(true);
-    try {
-      await adminSavePresets(value);
-      Taro.showToast({ title: '预设已保存', icon: 'success' });
-    } catch (e: any) {
-      Taro.showToast({ title: e?.message || '保存失败', icon: 'none' });
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  if (loading) return <Text className={styles.emptyTip}>加载中…</Text>;
-
-  return (
-    <View>
-      <SectionHeader title='LLM 预设' desc='公开配置（不含 API Key），用户可在设置页选这些厂商。' />
-      <Button size='mini' className={styles.addBtn} onClick={addPreset}>新增预设</Button>
-      {value.map((p, idx) => (
-        <View key={p.key || idx} className={styles.card}>
-          <View className={styles.cardHead}>
-            <Input className={styles.inlineInput} value={p.name} placeholder='展示名'
-              onInput={(e) => updatePreset(idx, { name: e.detail.value })} />
-            <Button size='mini' className={styles.delMini} onClick={() => removePreset(idx)}>删除</Button>
-          </View>
-          <View className={styles.cardHead}>
-            <Text className={styles.fieldLabel}>协议</Text>
-            <Picker mode='selector' range={PROTOCOLS}
-              onChange={(e) => updatePreset(idx, { protocol: PROTOCOLS[Number(e.detail.value)] as any })}>
-              <View className={styles.pickerBox}><Text>{p.protocol}</Text></View>
-            </Picker>
-          </View>
-          <Text className={styles.fieldLabel}>baseURL</Text>
-          <Input className={styles.inlineInput} value={p.baseURL}
-            onInput={(e) => updatePreset(idx, { baseURL: e.detail.value })} />
-          <Text className={styles.fieldLabel}>model</Text>
-          <Input className={styles.inlineInput} value={p.model}
-            onInput={(e) => updatePreset(idx, { model: e.detail.value })} />
-          <Text className={styles.fieldLabel}>keyUrl</Text>
-          <Input className={styles.inlineInput} value={p.keyUrl}
-            onInput={(e) => updatePreset(idx, { keyUrl: e.detail.value })} />
-          <Text className={styles.fieldLabel}>note</Text>
-          <Textarea className={styles.textarea} value={p.note || ''}
-            onInput={(e) => updatePreset(idx, { note: e.detail.value })} />
-        </View>
-      ))}
       <SaveBar isAdmin={isAdmin} saving={saving} onSave={onSave} />
     </View>
   );
@@ -1472,10 +1371,8 @@ export {
   TopicManagement,
   ModelParamsManagement,
   DailyManagement,
-  ApiBaseManagement,
   AttackSceneManagement,
   AttackCategoryManagement,
-  PresetManagement,
   PromptManagement,
   GlobalLLMManagement,
 };

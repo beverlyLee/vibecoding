@@ -20,6 +20,76 @@ function logf(level, msg) {
   console.log(JSON.stringify({ ts: Date.now(), level, fn: 'llm_proxy', msg }));
 }
 
+// ================================================================
+// LLM 每日次数限制（所有 LLM 调用的统一拦截点）
+// 规则：
+//   1. scene_config.main.llm_daily_limit 配置上限（默认 5），0 或负数 = 不限
+//   2. admin / operator 角色不受限
+//   3. 按自然日计数，跨天自动重置
+//   4. users 集合字段：llm_calls_date / llm_calls_today / llm_calls_total
+// ================================================================
+
+function todayStr() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+async function checkAndConsumeQuota() {
+  const ctx = cloud.getWXContext();
+  const openid = ctx.OPENID;
+  if (!openid) return { ok: true }; // 无身份（内部调用 / test），放行
+
+  // 1. 读取全局 limit 配置
+  let dailyLimit = 5;
+  try {
+    const cfg = await db.collection('scene_config').doc('main').get();
+    const v = cfg.data && cfg.data.llm_daily_limit;
+    if (typeof v === 'number') dailyLimit = v;
+  } catch (e) {
+    // 配置不存在 → 用默认 5
+  }
+  if (dailyLimit <= 0) return { ok: true }; // 0 或负数 = 不限
+
+  // 2. 查用户身份 + 今日次数
+  let user;
+  try {
+    const res = await db.collection('users').where({ openid }).limit(1).get();
+    user = res.data[0];
+  } catch (e) {
+    return { ok: true }; // users 集合不存在或查失败 → 放行（首次使用时）
+  }
+  if (!user) return { ok: true }; // 未注册用户放行（注册后自然受限）
+  if (user.role === 'admin' || user.role === 'operator') return { ok: true }; // 运营/管理员不限
+
+  const today = todayStr();
+  const lastDate = user.llm_calls_date || '';
+  const prevCount = lastDate === today ? (user.llm_calls_today || 0) : 0;
+
+  if (prevCount >= dailyLimit) {
+    logf('warn', `用户 ${openid} 今日 LLM 调用已用完 ${prevCount}/${dailyLimit}`);
+    return { ok: false, code: 429, message: `今日 LLM 调用次数已用完（${prevCount}/${dailyLimit}），明天再来吧~` };
+  }
+
+  // 3. 扣减（+1）
+  try {
+    const newCount = prevCount + 1;
+    await db.collection('users').doc(user._id).update({
+      data: {
+        llm_calls_date: today,
+        llm_calls_today: newCount,
+        llm_calls_total: (user.llm_calls_total || 0) + 1,
+      },
+    });
+    logf('info', `用户 ${openid} 今日 LLM ${newCount}/${dailyLimit} (今日) 总 ${(user.llm_calls_total || 0) + 1}`);
+  } catch (e) {
+    logf('error', `扣减次数失败: ${e && e.message}`);
+    // 扣减失败不阻断调用（避免 DB 抖动影响 LLM 可用性）
+  }
+
+  return { ok: true };
+}
+
 // 从 Responses API 的 output 数组中提取 assistant 文本
 // 格式参考：[{type:"message", role:"assistant", content:[{type:"output_text", text:"..."}]}, ...]
 function extractResponsesText(outputArr) {
@@ -98,6 +168,14 @@ function requestJSON(targetUrl, headers, bodyObj, timeoutMs) {
 }
 
 exports.main = async (event) => {
+  // ================================================================
+  // 0. LLM 每日次数限制（最前置拦截）
+  // ================================================================
+  const quota = await checkAndConsumeQuota();
+  if (!quota.ok) {
+    return { code: quota.code, message: quota.message, data: null };
+  }
+
   const {
     protocol = 'openai',
     baseURL = '',

@@ -13,6 +13,8 @@ import type {
   PromptsMap,
   Quote,
 } from '@/types/admin';
+import { invalidateCloudConfig } from '@/services/sceneConfig';
+import { useAppStore } from '@/store/useAppStore';
 
 const FUNC = 'admin_config';
 
@@ -41,11 +43,25 @@ export function adminGetConfig(): Promise<CloudSceneConfig> {
 }
 
 export function adminSaveSection(section: ConfigSection, value: unknown): Promise<{ section: string; value: unknown }> {
-  return call('saveSection', { section, value });
+  return call('saveSection', { section, value }).then((res) => {
+    // 管理后台任何 section 保存成功，立即让前端配置缓存失效
+    invalidateCloudConfig();
+    // 全局模型配置 section（虽然走 admin_global_llm 云函数，但 adminSaveSection 也会存到 scene_config 备份）
+    if (section === 'global_llm' || section === 'llm_daily_limit') {
+      useAppStore.getState().invalidateGlobalLLM();
+    }
+    return res;
+  });
 }
 
 export function adminResetSection(section: ConfigSection): Promise<{ section: string }> {
-  return call('resetSection', { section });
+  return call('resetSection', { section }).then((res) => {
+    invalidateCloudConfig();
+    if (section === 'global_llm' || section === 'llm_daily_limit') {
+      useAppStore.getState().invalidateGlobalLLM();
+    }
+    return res;
+  });
 }
 
 // ---------- 各区块便捷封装 ----------
@@ -70,8 +86,8 @@ export function adminSaveDailyTTL(days: number): Promise<unknown> {
   return adminSaveSection('daily_quote_ttl_days', days);
 }
 
-export function adminSaveApiBase(apiBase: string): Promise<unknown> {
-  return adminSaveSection('api_base', apiBase);
+export function adminSaveLLMDailyLimit(n: number): Promise<unknown> {
+  return adminSaveSection('llm_daily_limit', n);
 }
 
 export function adminSavePrompts(prompts: PromptsMap): Promise<unknown> {
@@ -80,10 +96,6 @@ export function adminSavePrompts(prompts: PromptsMap): Promise<unknown> {
 
 export function adminSaveModelParams(map: ModelParamsMap): Promise<unknown> {
   return adminSaveSection('model_params', map);
-}
-
-export function adminSavePresets(presets: LLMPreset[]): Promise<unknown> {
-  return adminSaveSection('presets', presets);
 }
 
 export function adminSaveAttackScenes(scenes: AttackScene[]): Promise<unknown> {
