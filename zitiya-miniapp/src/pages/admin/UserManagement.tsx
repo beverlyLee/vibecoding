@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { View, Text, Image, Input, Button } from '@tarojs/components';
 import Taro from '@tarojs/taro';
-import { adminList, adminStats, adminSetStatus, adminDelete, adminSetRole } from '@/services/adminUsers';
+import { adminList, adminStats, adminSetStatus, adminDelete, adminSetRole, adminSetMemberExpire } from '@/services/adminUsers';
 import type { AdminStats, UserListItem } from '@/types/admin';
 import styles from './index.module.scss';
 
@@ -129,6 +129,66 @@ export default function UserManagement({ isAdmin }: { isAdmin: boolean }) {
     });
   }
 
+  function isMemberValid(item: UserListItem): boolean {
+    if (!item.member_expire) return false;
+    const today = new Date().toISOString().slice(0, 10);
+    return item.member_expire > today;
+  }
+
+  async function handleSetMember(item: UserListItem) {
+    if (!isAdmin) return;
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+    const opts: string[] = [];
+    opts.push('开通 1 个月');
+    opts.push('开通 3 个月');
+    opts.push('开通 1 年');
+    opts.push('开通 3 年');
+    if (isMemberValid(item)) opts.push('取消会员');
+
+    const res = await new Promise<number>((resolve) => {
+      Taro.showActionSheet({
+        itemList: opts,
+        success: (r) => resolve(r.tapIndex),
+        fail: () => resolve(-1),
+      });
+    });
+    if (res < 0) return;
+
+    let newExpire: string | null = null;
+    if (res === 0) {
+      const d = new Date(now); d.setMonth(d.getMonth() + 1); newExpire = fmt(d);
+    } else if (res === 1) {
+      const d = new Date(now); d.setMonth(d.getMonth() + 3); newExpire = fmt(d);
+    } else if (res === 2) {
+      const d = new Date(now); d.setFullYear(d.getFullYear() + 1); newExpire = fmt(d);
+    } else if (res === 3) {
+      const d = new Date(now); d.setFullYear(d.getFullYear() + 3); newExpire = fmt(d);
+    } else if (res === 4) {
+      newExpire = null;  // 取消会员
+    } else {
+      return;
+    }
+
+    const confirmRes = await Taro.showModal({
+      title: newExpire ? '开通会员' : '取消会员',
+      content: newExpire
+        ? `将 ${item.nickname} 的会员到期设置为 ${newExpire}？`
+        : `确认取消 ${item.nickname} 的会员资格？`,
+    });
+    if (!confirmRes.confirm) return;
+
+    try {
+      await adminSetMemberExpire(item.openid, newExpire);
+      Taro.showToast({ title: newExpire ? `会员到期: ${newExpire}` : '已取消会员', icon: 'success' });
+      setItems((prev) => prev.map((u) => (u.openid === item.openid ? { ...u, member_expire: newExpire } : u)));
+    } catch (e: any) {
+      Taro.showToast({ title: e?.message || '操作失败', icon: 'none' });
+    }
+  }
+
   return (
     <View>
       {stats && (
@@ -216,6 +276,12 @@ export default function UserManagement({ isAdmin }: { isAdmin: boolean }) {
                           item.role === 'user' && styles.roleUser,
                         ].filter(Boolean).join(' ')}>{ROLE_LABEL[item.role]}</Text>
                       )}
+                      {item.member_expire && isMemberValid(item) && (
+                        <Text className={[styles.userRole, styles.roleAdmin].join(' ')}>🎖️ 会员至 {item.member_expire}</Text>
+                      )}
+                      {item.member_expire && !isMemberValid(item) && (
+                        <Text className={[styles.userRole, styles.roleUser].join(' ')}>会员已过期</Text>
+                      )}
                       <Text className={[
                         styles.userStatus,
                         item.status === 'active' ? styles.statusActive : styles.statusBanned,
@@ -229,6 +295,7 @@ export default function UserManagement({ isAdmin }: { isAdmin: boolean }) {
                 {isAdmin && (
                   <View className={styles.userActions}>
                     <Button size='mini' className={styles.actionBtn} onClick={() => pickRole(item)}>变更角色</Button>
+                    <Button size='mini' className={styles.actionBtn} onClick={() => handleSetMember(item)}>会员</Button>
                     <Button size='mini'
                       className={item.status === 'active' ? [styles.actionBtn, styles.actionBtnWarn].join(' ') : [styles.actionBtn, styles.actionBtnPrimary].join(' ')}
                       onClick={() => handleToggleStatus(item)}>{item.status === 'active' ? '封禁' : '解封'}</Button>

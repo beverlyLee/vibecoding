@@ -12,8 +12,8 @@ import {
   adminSaveDailyLimit,
   adminSaveDailyTTL,
   adminSaveIntents,
-  adminSaveLLMDailyLimit,
   adminSaveModelParams,
+  adminSavePoints,
   adminSavePrompts,
   adminSaveQuotes,
   adminSaveTopics,
@@ -48,6 +48,7 @@ import type {
   IntentRule,
   LLMPreset,
   ModelParamsMap,
+  PointsConfig,
   PromptsMap,
   Quote,
 } from '@/types/admin';
@@ -57,7 +58,7 @@ import {
   DEFAULT_CRAWL_TOPICS,
   DEFAULT_MODEL_PARAMS,
   DEFAULT_DAILY_TTL_DAYS,
-  DEFAULT_LLM_DAILY_LIMIT,
+  DEFAULT_POINTS,
 } from '@/services/sceneConfig';
 import { ATTACK_CATEGORIES, ATTACK_SCENES } from '@/data/attackScenes';
 import { INTENT_RULES } from '@/data/intents';
@@ -466,7 +467,6 @@ function ModelParamsManagement({ isAdmin }: { isAdmin: boolean }) {
 function DailyManagement({ isAdmin }: { isAdmin: boolean }) {
   const limitHook = useConfig<number>((c) => c.daily_quote_limit, 12);
   const ttlHook = useConfig<number>((c) => c.daily_quote_ttl_days, DEFAULT_DAILY_TTL_DAYS);
-  const llmLimitHook = useConfig<number>((c) => c.llm_daily_limit, DEFAULT_LLM_DAILY_LIMIT);
   const [saving, setSaving] = useState(false);
 
   async function onSave() {
@@ -475,7 +475,6 @@ function DailyManagement({ isAdmin }: { isAdmin: boolean }) {
       await Promise.all([
         adminSaveDailyLimit(limitHook.value),
         adminSaveDailyTTL(ttlHook.value),
-        adminSaveLLMDailyLimit(llmLimitHook.value),
       ]);
       Taro.showToast({ title: '每日参数已保存', icon: 'success' });
     } catch (e: any) {
@@ -485,11 +484,11 @@ function DailyManagement({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
-  if (limitHook.loading || ttlHook.loading || llmLimitHook.loading) return <Text className={styles.emptyTip}>加载中…</Text>;
+  if (limitHook.loading || ttlHook.loading) return <Text className={styles.emptyTip}>加载中…</Text>;
 
   return (
     <View>
-      <SectionHeader title='每日参数' desc='控制云函数 daily_crawler 每天从语料池入库上限、语录缓存过期天数、以及 LLM 每日调用次数上限。' />
+      <SectionHeader title='每日参数' desc='控制云函数 daily_crawler 每天从语料池入库上限、语录缓存过期天数。' />
       <View className={styles.card}>
         <Text className={styles.fieldLabel}>每日入库上限（条，默认 12）</Text>
         <Input className={styles.inlineInput} type='digit' value={String(limitHook.value)}
@@ -497,10 +496,72 @@ function DailyManagement({ isAdmin }: { isAdmin: boolean }) {
         <Text className={styles.fieldLabel}>语录缓存 TTL（天，默认 7，1~30）</Text>
         <Input className={styles.inlineInput} type='digit' value={String(ttlHook.value)}
           onInput={(e) => ttlHook.setValue(Number(e.detail.value) || 0)} />
-        <Text className={styles.fieldLabel}>LLM 每日调用上限（次，默认 5；0 或负数 = 不限，后续会员扩展）</Text>
-        <Input className={styles.inlineInput} type='digit' value={String(llmLimitHook.value)}
-          onInput={(e) => llmLimitHook.setValue(Number(e.detail.value) || 0)} />
       </View>
+      <SaveBar isAdmin={isAdmin} saving={saving} onSave={onSave} />
+    </View>
+  );
+}
+
+// ================================================================
+// 积分规则
+// ================================================================
+function PointsManagement({ isAdmin }: { isAdmin: boolean }) {
+  const { value, setValue, loading, saving, setSaving } = useConfig<PointsConfig>(
+    (c) => c.points,
+    { ...DEFAULT_POINTS }
+  );
+
+  function updateField(field: keyof PointsConfig, num: number) {
+    setValue((prev) => ({ ...prev, [field]: Math.max(0, Math.round(num)) }));
+  }
+
+  async function onSave() {
+    setSaving(true);
+    try {
+      await adminSavePoints(value);
+      Taro.showToast({ title: '积分规则已保存', icon: 'success' });
+    } catch (e: any) {
+      Taro.showToast({ title: e?.message || '保存失败', icon: 'none' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <Text className={styles.emptyTip}>加载中…</Text>;
+
+  const initialBonus = value.initial_bonus ?? DEFAULT_POINTS.initial_bonus;
+  const checkin = value.daily_checkin ?? DEFAULT_POINTS.daily_checkin;
+
+  return (
+    <View>
+      <SectionHeader
+        title='积分规则'
+        desc='新用户注册即送赠送积分。每日签到手动领取每日额度（累积不清零，积少成多）。每次 AI 分析消耗 1 积分。会员享每日翻倍。'
+      />
+      <View className={styles.card}>
+        <Text className={styles.fieldLabel}>🎁 新用户注册赠送（默认 100，幂等只送一次）</Text>
+        <Input
+          className={styles.inlineInput}
+          type='digit'
+          value={String(initialBonus)}
+          onInput={(e) => updateField('initial_bonus', Number(e.detail.value) || 0)}
+        />
+        <Text className={styles.fieldLabel}>每日签到赠送（默认 5，会员翻倍）</Text>
+        <Input
+          className={styles.inlineInput}
+          type='digit'
+          value={String(checkin)}
+          onInput={(e) => updateField('daily_checkin', Number(e.detail.value) || 0)}
+        />
+      </View>
+
+      <View className={styles.card}>
+        <Text className={styles.cardTitle}>📊 当前规则预览</Text>
+        <Text className={styles.metaTip}>🎁 新用户：注册即送 {initialBonus} 积分</Text>
+        <Text className={styles.metaTip}>普通用户：每日签到 +{checkin} 积分</Text>
+        <Text className={styles.metaTip}>会员：每日签到 +{checkin * 2} 积分（翻倍）</Text>
+      </View>
+
       <SaveBar isAdmin={isAdmin} saving={saving} onSave={onSave} />
     </View>
   );
@@ -1371,6 +1432,7 @@ export {
   TopicManagement,
   ModelParamsManagement,
   DailyManagement,
+  PointsManagement,
   AttackSceneManagement,
   AttackCategoryManagement,
   PromptManagement,

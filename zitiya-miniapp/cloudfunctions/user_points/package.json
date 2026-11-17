@@ -1,0 +1,10 @@
+{
+  "name": "user_points",
+  "version": "1.0.0",
+  "private": true,
+  "description": "嘴替鸭积分单表管理：唯一真相源，所有积分读写走这",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

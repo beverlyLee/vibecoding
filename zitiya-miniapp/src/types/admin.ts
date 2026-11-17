@@ -22,6 +22,9 @@ export interface UserListItem {
   createdAt: number | Date;
   lastLoginAt: number | Date;
   loginCount: number;
+  member_expire?: string | null;  // 会员到期时间（ISO 日期）
+  points?: number;                // 当前总余额
+  points_total?: number;          // 累计消耗积分
 }
 
 export interface UserListResp {
@@ -64,6 +67,12 @@ export type ModelParamsMap = Record<string, ModelParamValue>;
 /** LLM system prompt 覆盖（key 见 DEFAULT_PROMPTS） */
 export type PromptsMap = Record<string, string>;
 
+/** 积分规则配置 */
+export interface PointsConfig {
+  initial_bonus?: number;   // 新用户注册赠送积分（默认 100，幂等只送一次）
+  daily_checkin?: number;   // 每日签到赠送积分（默认 5，会员自动翻倍）
+}
+
 /** 云端 scene_config.main 文档的业务字段（不含 _id 等内部字段） */
 export interface CloudSceneConfig {
   intents?: IntentRule[];
@@ -71,13 +80,13 @@ export interface CloudSceneConfig {
   crawl_topics?: string[];
   daily_quote_limit?: number;
   daily_quote_ttl_days?: number;
-  llm_daily_limit?: number;
   api_base?: string;
   prompts?: PromptsMap;
   model_params?: ModelParamsMap;
   presets?: LLMPreset[];
   attack_scenes?: AttackScene[];
   attack_categories?: string[];
+  points?: PointsConfig;
 }
 
 /** 可写入的区块名（与云函数白名单一致） */
@@ -87,10 +96,10 @@ export type ConfigSection =
   | 'crawl_topics'
   | 'daily_quote_limit'
   | 'daily_quote_ttl_days'
-  | 'llm_daily_limit'
   | 'api_base'
   | 'prompts'
   | 'model_params'
   | 'presets'
   | 'attack_scenes'
-  | 'attack_categories';
+  | 'attack_categories'
+  | 'points';

@@ -1,5 +1,5 @@
 export default defineAppConfig({
-  pages: ['pages/home/index', 'pages/defend/index', 'pages/attack/index', 'pages/quotes/index', 'pages/profile/index', 'pages/privacy/index', 'pages/admin/index'],
+  pages: ['pages/home/index', 'pages/defend/index', 'pages/attack/index', 'pages/quotes/index', 'pages/profile/index', 'pages/checkin/index', 'pages/privacy/index', 'pages/admin/index'],
   // 组件按需注入（代码质量扫描要求）
   lazyCodeLoading: 'requiredComponents',
   window: {

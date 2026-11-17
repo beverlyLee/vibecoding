@@ -9,6 +9,7 @@
 // 订阅用 Set 存回调，store 变化时批量通知，React hook 用 useState 订阅。
 
 import { useState, useEffect } from 'react';
+import Taro from '@tarojs/taro';
 import type { LoginStatus, UserProfile } from '@/types/user';
 import {
   restoreSession,
@@ -37,6 +38,10 @@ export interface AuthApi {
   requireLogin: (actionLabel?: string) => boolean;
   isLoggedIn: () => boolean;
   role: () => UserProfile['role'] | null;
+  // 积分 & 会员
+  isMember: () => boolean;
+  refreshPoints: () => Promise<void>;
+  deductPoints: () => void;   // LLM 成功后本地 -1（乐观更新）
 }
 
 // ================================================================
@@ -134,6 +139,35 @@ function getGlobal(): GlobalStore {
     },
 
     role: () => g.state.user?.role || null,
+
+    // 会员判断
+    isMember: () => {
+      const exp = g.state.user?.member_expire;
+      if (!exp) return false;
+      const today = new Date().toISOString().slice(0, 10);
+      return exp > today;
+    },
+
+    // 刷新积分（调 user.me）
+    refreshPoints: async () => {
+      if (g.state.status !== 'authenticated' || !g.state.user) return;
+      try {
+        const res = await Taro.cloud.callFunction({ name: 'user', data: { action: 'me' } });
+        const u = res?.result?.data;
+        if (u) setState({ user: { ...g.state.user, ...u } });
+      } catch (e) {
+        console.warn('[Auth] refreshPoints 失败:', e);
+      }
+    },
+
+    // LLM 调用成功后，乐观更新 -1（避免再发一次请求）
+    deductPoints: () => {
+      if (!g.state.user) return;
+      const cur = g.state.user.points;
+      if (typeof cur === 'number') {
+        setState({ user: { ...g.state.user, points: Math.max(0, cur - 1) } });
+      }
+    },
   };
 
   (globalThis as any)[GT_KEY] = g;

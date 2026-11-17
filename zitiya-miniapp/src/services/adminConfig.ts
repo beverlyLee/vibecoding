@@ -10,6 +10,7 @@ import type {
   IntentRule,
   LLMPreset,
   ModelParamsMap,
+  PointsConfig,
   PromptsMap,
   Quote,
 } from '@/types/admin';
@@ -46,8 +47,7 @@ export function adminSaveSection(section: ConfigSection, value: unknown): Promis
   return call('saveSection', { section, value }).then((res) => {
     // 管理后台任何 section 保存成功，立即让前端配置缓存失效
     invalidateCloudConfig();
-    // 全局模型配置 section（虽然走 admin_global_llm 云函数，但 adminSaveSection 也会存到 scene_config 备份）
-    if (section === 'global_llm' || section === 'llm_daily_limit') {
+    if (section === 'global_llm') {
       useAppStore.getState().invalidateGlobalLLM();
     }
     return res;
@@ -57,7 +57,7 @@ export function adminSaveSection(section: ConfigSection, value: unknown): Promis
 export function adminResetSection(section: ConfigSection): Promise<{ section: string }> {
   return call('resetSection', { section }).then((res) => {
     invalidateCloudConfig();
-    if (section === 'global_llm' || section === 'llm_daily_limit') {
+    if (section === 'global_llm') {
       useAppStore.getState().invalidateGlobalLLM();
     }
     return res;
@@ -86,10 +86,6 @@ export function adminSaveDailyTTL(days: number): Promise<unknown> {
   return adminSaveSection('daily_quote_ttl_days', days);
 }
 
-export function adminSaveLLMDailyLimit(n: number): Promise<unknown> {
-  return adminSaveSection('llm_daily_limit', n);
-}
-
 export function adminSavePrompts(prompts: PromptsMap): Promise<unknown> {
   return adminSaveSection('prompts', prompts);
 }
@@ -104,4 +100,8 @@ export function adminSaveAttackScenes(scenes: AttackScene[]): Promise<unknown> {
 
 export function adminSaveAttackCategories(categories: string[]): Promise<unknown> {
   return adminSaveSection('attack_categories', categories);
+}
+
+export function adminSavePoints(points: PointsConfig): Promise<unknown> {
+  return adminSaveSection('points', points);
 }

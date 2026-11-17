@@ -6,6 +6,7 @@ import { getAttackCategories, getAttackScenes } from '@/services/sceneConfig';
 import { useUserStore } from '@/store/useUserStore';
 import { useLoginSheet } from '@/hooks/useLoginSheet';
 import logoDuck from '@/assets/logo.png';
+import PointsBar from '@/components/PointsBar';
 import styles from './index.module.scss';
 
 const FREE_LIMIT = 3; // 未登录时免费看前 3 个场景
@@ -37,6 +38,7 @@ export default function AttackPage() {
           <Text className={styles.heroTitle}>场景出招</Text>
           <Text className={styles.heroDesc}>不用等别人先开口，主动出击心里更有底</Text>
         </View>
+        <PointsBar />
       </View>
 
       {/* 分类筛选 */}

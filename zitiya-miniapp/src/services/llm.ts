@@ -48,7 +48,29 @@ export function extractJSON<T>(raw: string): T | null {
     start = Math.min(firstBrace, firstBracket);
     end = firstBrace < firstBracket ? text.lastIndexOf('}') : text.lastIndexOf(']');
   }
-  if (end <= start) return null;
+
+  // —— 自愈：LLM 输出可能被 max_tokens 截断，缺结尾 } 或 ] ——
+  if (end <= start) {
+    // 找 start 之后最后一个未被转义的双引号，补闭合
+    let lastQuote = -1;
+    for (let i = text.length - 1; i > start; i--) {
+      if (text[i] === '"') {
+        // 检查是否被转义（反斜杠数量为偶数 = 未转义）
+        let bs = 0;
+        for (let j = i - 1; j >= start && text[j] === '\\'; j--) bs++;
+        if (bs % 2 === 0) { lastQuote = i; break; }
+      }
+    }
+    if (lastQuote > start) {
+      const suffix = text[start] === '{' ? '}' : ']';
+      const mended = text.slice(start, lastQuote + 1) + suffix;
+      logger.warn('[LLM] JSON 被截断, 已自愈补闭合:', { rawLen: text.length, mendedLen: mended.length });
+      try {
+        return JSON.parse(mended) as T;
+      } catch { /* 继续走 null */ }
+    }
+    return null;
+  }
 
   try {
     return JSON.parse(text.slice(start, end + 1)) as T;
@@ -206,7 +228,9 @@ async function callOpenAI(cfg: LLMConfig, messages: ChatMessage[], opts: { tempe
     if (!result || result.code !== 0) {
       const errMsg = (result && result.message) || `代理调用失败（code ${result?.code}）`;
       logger.error('[HTTP] llm.callOpenAI ✘ 代理', `${Date.now() - httpStart}ms`, errMsg);
-      throw new Error(errMsg);
+      const err: any = new Error(errMsg);
+      err.code = result?.code;
+      throw err;
     }
     logger.debug('[HTTP] llm.callOpenAI ✔ 代理', `${Date.now() - httpStart}ms`, 'text长度:', result?.data?.text?.length || 0);
     return { text: result.data.text, usage: result.data.usage };
@@ -272,7 +296,9 @@ async function callAnthropic(cfg: LLMConfig, messages: ChatMessage[], opts: { te
     if (!result || result.code !== 0) {
       const errMsg = (result && result.message) || `代理调用失败（code ${result?.code}）`;
       logger.error('[HTTP] llm.callAnthropic ✘ 代理', `${Date.now() - httpStart}ms`, errMsg);
-      throw new Error(errMsg);
+      const err: any = new Error(errMsg);
+      err.code = result?.code;
+      throw err;
     }
     logger.debug('[HTTP] llm.callAnthropic ✔ 代理', `${Date.now() - httpStart}ms`);
     return { text: result.data.text, usage: result.data.usage };

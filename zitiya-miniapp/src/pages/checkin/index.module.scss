@@ -1,0 +1,287 @@
+@import '@/styles/theme.scss';
+
+.page {
+  min-height: 100vh;
+  background: $color-bg-page;
+  padding: 24rpx 28rpx 120rpx;
+  box-sizing: border-box;
+}
+
+// 顶部金币卡片（主色调渐变）
+.headerCard {
+  background: linear-gradient(135deg, $color-primary 0%, $color-primary-dark 100%);
+  border-radius: 24rpx;
+  padding: 36rpx 32rpx;
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  box-shadow: 0 8rpx 28rpx rgba($color-primary, 0.35);
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -40rpx;
+    right: -40rpx;
+    width: 200rpx;
+    height: 200rpx;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+  }
+}
+
+.coinIcon {
+  font-size: 72rpx;
+  line-height: 1;
+  filter: drop-shadow(0 4rpx 8rpx rgba(0, 0, 0, 0.1));
+}
+
+.pointsRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6rpx;
+}
+
+.pointsNum {
+  font-size: 60rpx;
+  font-weight: 800;
+  color: #FFFFFF;
+  line-height: 1;
+}
+
+.pointsLabel {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 500;
+}
+
+.rewardInfo {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6rpx;
+  z-index: 1;
+}
+
+.memberBadge {
+  font-size: 22rpx;
+  color: $color-primary;
+  background: #FFFFFF;
+  padding: 4rpx 12rpx;
+  border-radius: 16rpx;
+  font-weight: 600;
+}
+
+.rewardText {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.2);
+  padding: 4rpx 14rpx;
+  border-radius: 12rpx;
+  font-weight: 500;
+}
+
+// 连续签到（主色调浅底）
+.consecutiveCard {
+  margin-top: 24rpx;
+  background: rgba($color-primary, 0.08);
+  border-radius: 20rpx;
+  padding: 24rpx 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+}
+
+.consecutiveEmoji {
+  font-size: 32rpx;
+}
+
+.consecutiveText {
+  font-size: 28rpx;
+  color: $color-primary-dark;
+  font-weight: 500;
+}
+
+.consecutiveNum {
+  font-size: 36rpx;
+  font-weight: 800;
+  color: $color-primary;
+  margin: 0 4rpx;
+}
+
+// 区块卡片
+.sectionCard {
+  margin-top: 28rpx;
+  background: #FFFFFF;
+  border-radius: 20rpx;
+  padding: 28rpx;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.04);
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20rpx;
+}
+
+.sectionTitle {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1A1A1A;
+}
+
+.sectionLegend {
+  font-size: 22rpx;
+  color: #999;
+}
+
+.moreLink {
+  font-size: 22rpx;
+  color: $color-primary;
+  font-weight: 500;
+}
+
+// 星期表头
+.weekHeader {
+  display: flex;
+  margin-bottom: 12rpx;
+}
+
+.weekLabel {
+  flex: 1;
+  text-align: center;
+  font-size: 22rpx;
+  color: #999;
+}
+
+// 日历行
+.weekRow {
+  display: flex;
+  gap: 6rpx;
+  margin-bottom: 12rpx;
+}
+
+.dayCell {
+  flex: 1;
+  /* 微信小程序不支持 aspect-ratio，用固定高度 */
+  height: 100rpx;
+  background: #F5F5F5;
+  border-radius: 12rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all 0.15s ease;
+}
+
+.dayNum {
+  font-size: 28rpx;
+  color: #666;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.dayCheck {
+  font-size: 20rpx;
+  color: #FFFFFF;
+  line-height: 1;
+  margin-top: 4rpx;
+}
+
+.dayCheckLabel {
+  font-size: 18rpx;
+  color: #FFFFFF;
+  line-height: 1;
+  margin-top: 4rpx;
+  font-weight: 500;
+}
+
+.dayBtnLabel {
+  font-size: 18rpx;
+  color: #FFFFFF;
+  line-height: 1;
+  margin-top: 4rpx;
+  font-weight: 600;
+}
+
+// 已签到 → 主色调蓝
+.dayChecked {
+  background: linear-gradient(135deg, $color-primary, $color-primary-dark);
+
+  .dayNum {
+    color: #FFFFFF;
+    font-weight: 600;
+  }
+}
+
+// 今天（未签到）→ 主色调边框高亮
+.dayToday {
+  border: 2rpx solid $color-primary;
+  box-shadow: 0 0 0 2rpx rgba($color-primary, 0.15);
+}
+
+// 今天签到按钮 → 主色调实底 + 点击放大
+.dayBtn {
+  background: linear-gradient(135deg, $color-primary, $color-primary-dark);
+  cursor: pointer;
+
+  .dayNum {
+    color: #FFFFFF;
+    font-weight: 600;
+  }
+
+  &:active {
+    transform: scale(0.92);
+  }
+}
+
+// 流水行
+.txRow {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  padding: 14rpx 0;
+  border-bottom: 1rpx solid #F0F0F0;
+
+  &:last-child { border-bottom: none; }
+}
+
+.txEmoji {
+  font-size: 28rpx;
+  line-height: 1;
+}
+
+.txReason {
+  flex: 1;
+  font-size: 26rpx;
+  color: #333;
+}
+
+.txDate {
+  font-size: 22rpx;
+  color: #BBB;
+}
+
+.txDelta {
+  font-size: 28rpx;
+  font-weight: 600;
+  min-width: 60rpx;
+  text-align: right;
+}
+
+.txPlus { color: $color-primary; }
+.txMinus { color: #999; }
+
+// 底部提示
+.footerTip {
+  margin-top: 40rpx;
+  text-align: center;
+  font-size: 22rpx;
+  color: #AAA;
+  line-height: 1.6;
+}

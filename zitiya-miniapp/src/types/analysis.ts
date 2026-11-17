@@ -14,6 +14,8 @@ export interface Response {
   style: ResponseStyle;
   text: string;
   reason: string;
+  // 一句话口诀锚点（如「先接后拒，留台阶」）；由 AI 生成，旧数据可能缺失，缺省不展示
+  reasonShort?: string;
   // 规则引擎模式下提供的换说法备选
   variants?: string[];
 }
@@ -64,3 +66,34 @@ export const INTENSITY_META: Record<IntensityLevel, { label: string; color: stri
   medium: { label: '让人不适', color: '#FF7D00' },
   high: { label: '明显施压', color: '#F53F3F' }
 };
+
+// 风格对应的大号 emoji 头像（锦囊卡视觉锚点）
+export const STYLE_EMOJI: Record<ResponseStyle, string> = {
+  gentle: '🕊️',
+  humor: '😏',
+  direct: '🛡️',
+  counter: '🎯'
+};
+
+// 风格内置口诀（既无 AI 口诀、又无 reason 时的兜底，保证锦囊卡永远有一句短结论）
+const STYLE_MOTTO: Record<ResponseStyle, string> = {
+  gentle: '先接住，再轻轻化开',
+  humor: '笑着把话接过去',
+  direct: '温和，但把边界说清',
+  counter: '把问题轻轻递回去'
+};
+
+/**
+ * 口诀锚点：不依赖 AI 新增字段，直接从现有文本提炼一句短结论。
+ * 优先级：reasonShort（AI 已生成）→ reason 首句（截断 18 字）→ 风格内置口诀。
+ * 保证 llm / rule / fallback 任何来源都有一句可见口诀，改版效果立即可见。
+ */
+export function deriveMotto(r: Response): string {
+  if (r.reasonShort && r.reasonShort.trim()) return r.reasonShort.trim();
+  const reason = (r.reason || '').trim();
+  if (reason) {
+    const first = reason.split(/[。！？!?；;\n]/)[0].trim().replace(/[，,、：:]$/, '');
+    if (first) return first.length > 18 ? `${first.slice(0, 18)}…` : first;
+  }
+  return STYLE_MOTTO[r.style] || '照着说就行';
+}

@@ -9,6 +9,7 @@ import styles from './index.module.scss';
 import { track } from '@/utils/logger';
 import { HOME_ICONS } from './homeIcons';
 import { fetchSocialTips, FALLBACK_TIPS, type SocialTip } from '@/services/socialTips';
+import PointsBar from '@/components/PointsBar';
 
 // 根据当前时间给出友好问候
 function getGreeting() {
@@ -74,17 +75,20 @@ export default function HomePage() {
           <Text className={styles.title}>{titleText}</Text>
           <Text className={styles.subtitle}>好好说话，温柔连接每一次开口 🌟</Text>
         </View>
+        <PointsBar />
       </View>
 
       {/* 未登录提示条：点击弹出登录弹层 */}
       {!isLoggedIn && (
         <View className={styles.loginBanner}>
-          <Text className={styles.loginBannerText}>登录后使用更多功能哦</Text>
+          <Text className={styles.loginBannerText}>
+            登录解锁 AI 拆招、出招、保存语录等全部功能
+          </Text>
           <View
             className={styles.loginBannerBtn}
-            onClick={() => requireLogin('登录后使用更多功能')}
+            onClick={() => requireLogin('登录解锁 AI 拆招')}
           >
-            <Text className={styles.loginBannerBtnText}>去登录</Text>
+            <Text className={styles.loginBannerBtnText}>立即登录</Text>
           </View>
         </View>
       )}

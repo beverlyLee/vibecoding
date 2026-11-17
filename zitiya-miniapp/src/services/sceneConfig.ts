@@ -188,8 +188,11 @@ export const DEFAULT_PROMPTS: Record<string, string> = {
 【输出】严格只输出一个 JSON 对象，禁止 markdown 代码块、禁止任何解释或前后缀文字。格式：
 {"intents":["意图名称1","意图名称2","意图名称3"],"intensity":"low|medium|high","situation":"处境与应对要点","responses":[{"style":"gentle","text":"回话内容","reason":"有效原因"},{"style":"humor","text":"回话内容","reason":"有效原因"},{"style":"direct","text":"回话内容","reason":"有效原因"},{"style":"counter","text":"回话内容","reason":"有效原因"}]}`,
 
-  // engine.rewriteVariants：回话改写变体的 system prompt
-  rewrite: `你是话术改写助手。只输出 JSON，格式：{"text":"改写后的回话"}。`,
+  // engine.rephraseResponse：换说法的 system prompt（保持同风格只换措辞）
+  rewrite: `你是话术改写助手。
+任务：把用户给的回话换一种说法，保持原风格、原意、立场不变，只用不同句式和措辞。
+要求：15~60字，口语化，可直接照着说。
+只输出 JSON：{"text":"改写后的内容"}`,
 
   // engine.rephraseResponse：换说法的 user 提示词模板（占位符会被替换）
   rephraseUser: `我正在应对这句话：「{{utterance}}」
@@ -206,14 +209,17 @@ export const DEFAULT_PROMPTS: Record<string, string> = {
 export const DEFAULT_MODEL_PARAMS: Record<string, { temperature: number; maxTokens: number; timeout: number }> = {
   default: { temperature: 0.8, maxTokens: 1500, timeout: 30000 },
   analyze: { temperature: 0.8, maxTokens: 1200, timeout: 25000 },
-  rephrase: { temperature: 1.0, maxTokens: 200, timeout: 15000 },
+  rephrase: { temperature: 1.0, maxTokens: 500, timeout: 15000 },
   test: { temperature: 0.0, maxTokens: 20, timeout: 20000 }
 };
 
 export const DEFAULT_DAILY_TTL_DAYS = 7;
 
-/** 每日 LLM 调用次数上限（普通用户）；0 或负数 = 不限 */
-export const DEFAULT_LLM_DAILY_LIMIT = 5;
+/** 积分规则默认值 */
+export const DEFAULT_POINTS = {
+  initial_bonus: 100,   // 新用户注册赠送（幂等，只送一次）
+  daily_checkin: 5,     // 每日签到赠送（手动触发，会员翻倍）
+};
 
 // 后端 API 基地址（FastAPI 数据服务器）默认值
 export const DEFAULT_API_BASE = 'http://localhost:8080';

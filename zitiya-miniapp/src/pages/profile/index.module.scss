@@ -208,6 +208,7 @@
 .menuIconAdmin { background: #fff2e8; }
 .menuIconPrivacy { background: #e6f4ff; }
 .menuIconLogout { background: #fff1f0; }
+.menuIconCheckin { background: #FFF8E6; }
 
 .menuLabel {
   flex: 1;
@@ -224,6 +225,15 @@
   font-size: $font-size-sm;
   color: $color-text-tertiary;
   margin-right: $spacing-sm;
+}
+
+.menuValueTodo {
+  color: #FF6B40;
+  font-weight: 500;
+}
+
+.menuValueDone {
+  color: #999999;
 }
 
 // 按钮

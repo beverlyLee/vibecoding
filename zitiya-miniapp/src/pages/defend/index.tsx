@@ -13,6 +13,7 @@ import { useLoginSheet } from '@/hooks/useLoginSheet';
 import AddQuoteSheet from '@/pages/quotes/AddQuoteSheet';
 import type { AnalysisResult, Response } from '@/types/analysis';
 import logoDuck from '@/assets/logo.png';
+import PointsBar from '@/components/PointsBar';
 import styles from './index.module.scss';
 import { logger, track } from '@/utils/logger';
 import { EVENTS } from '@/utils/monitor';
@@ -27,7 +28,7 @@ function showSourceToast(source: string) {
       // 正常命中 / LLM 降级 / 规则库未匹配但无 LLM —— 全部静默，结果照展示
       break;
     case 'quota_exceeded':
-      Taro.showToast({ title: '今日次数已用完，鸭鸭继续帮你拆招~', icon: 'none', duration: 2500 });
+      Taro.showToast({ title: '积分为空，点击右上角积分签到领取', icon: 'none', duration: 2500 });
       break;
   }
 }
@@ -117,19 +118,32 @@ export default function DefendPage() {
     if (!requireLogin('换个说法')) return;
     setRephrasingId(response.id);
     try {
-      const newText = await rephraseResponse(result.utterance, response, response.text);
+      const prevText = response.text;
+      const newText = await rephraseResponse(result.utterance, response, prevText);
+      if (newText === prevText) {
+        Taro.showToast({ title: '暂时没新说法了，试试别的风格？', icon: 'none', duration: 2000 });
+        return;
+      }
       setResult((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
           responses: prev.responses.map((r) =>
-            r.id === response.id ? { ...r, text: newText } : r
+            r.id === response.id
+              ? { ...r, text: newText, variants: [...(r.variants || []), newText] }
+              : r
           )
         };
       });
-    } catch (err) {
-      logger.error('[Defend] 换说法失败:', err instanceof Error ? err.message : err);
-      Taro.showToast({ title: '换个说法失败了', icon: 'none' });
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      const isQuota = err?.code === 429 || msg.includes('积分不足') || msg.includes('积分为空');
+      if (isQuota) {
+        Taro.showToast({ title: '积分为空，点击右上角积分签到领取', icon: 'none', duration: 2500 });
+      } else {
+        logger.error('[Defend] 换说法失败:', msg);
+        Taro.showToast({ title: '换个说法失败了', icon: 'none' });
+      }
     } finally {
       setRephrasingId(null);
     }
@@ -177,7 +191,23 @@ export default function DefendPage() {
             <Text className={styles.greet}>帮你拆招</Text>
             <Text className={styles.welcomeSub}>接不上话的时刻，把原话交给我</Text>
           </View>
+          <PointsBar />
         </View>
+
+        {/* 未登录积分吸引条 */}
+        {!loggedIn && (
+          <View className={styles.loginBanner}>
+            <Text className={styles.loginBannerText}>
+              登录解锁 AI 拆招、换说法、保存语录等全部功能
+            </Text>
+            <View
+              className={styles.loginBannerBtn}
+              onClick={() => requireLogin('登录解锁 AI 拆招')}
+            >
+              <Text className={styles.loginBannerBtnText}>立即登录</Text>
+            </View>
+          </View>
+        )}
 
         <View className={styles.welcomeCard}>
           <Text className={styles.welcomeDesc}>
@@ -236,8 +266,16 @@ export default function DefendPage() {
 
         {!analyzing && result && (
           <>
-            <View className={styles.resultHeader}>
-              <Text className={styles.resultTitle}>为你想了 {result.responses.length} 套回话</Text>
+            {/* 鸭鸭结论条：IP 露出 + 一眼看到结果数量 */}
+            <View className={styles.heroBanner}>
+              <Image className={styles.heroDuck} src={logoDuck} mode='aspectFit' />
+              <View className={styles.heroTexts}>
+                <Text className={styles.heroTitle}>别慌，鸭鸭帮你看穿了 👀</Text>
+                <Text className={styles.heroSub}>
+                  给你备好 <Text className={styles.heroNum}>{result.responses.length}</Text> 套回话，挑一句直接发
+                </Text>
+              </View>
+              <Text className={styles.heroSpark}>✨</Text>
             </View>
             <View className={styles.intentCard}>
               <IntentCard result={result} />
@@ -272,10 +310,11 @@ export default function DefendPage() {
               </View>
             )}
 
-            {result.responses.map((r) => (
+            {result.responses.map((r, idx) => (
               <View key={r.id} className={styles.responseItem}>
                 <ResponseCard
                   response={r}
+                  index={idx}
                   rephrasing={rephrasingId === r.id}
                   onCopy={handleCopy}
                   onRephrase={handleRephrase}

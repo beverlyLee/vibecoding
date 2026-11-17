@@ -72,6 +72,9 @@ function listItem(user, callerRole) {
     createdAt: user.createdAt,
     lastLoginAt: user.lastLoginAt,
     loginCount: user.loginCount || 0,
+    member_expire: user.member_expire || null,  // 会员到期时间（所有运营可见）
+    points: typeof user.points === 'number' ? user.points : 0, // 当前余额
+    points_total: user.points_total || 0,        // 累计消耗
   };
   if (callerRole === 'admin') {
     item.role = user.role;
@@ -255,6 +258,41 @@ async function actionSetRole(event) {
 }
 
 // ================================================================
+// action: setMemberExpire（admin 给用户设置会员到期时间）
+// ================================================================
+async function actionSetMemberExpire(event) {
+  const caller = await requireRole('admin');
+  const { openid, member_expire } = event || {};
+
+  if (!openid) return err('缺少 openid');
+
+  const target = await findByOpenid(openid);
+  if (!target) return err('用户不存在', 404);
+
+  // member_expire 可以是 ISO 日期字符串（如 "2026-12-31"）或 null（清除会员）
+  let expireValue = member_expire;
+  if (expireValue !== null && expireValue !== undefined) {
+    if (typeof expireValue !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(expireValue)) {
+      return err('member_expire 必须是 YYYY-MM-DD 格式的日期字符串，或 null 清除会员');
+    }
+  }
+
+  const updateData = {};
+  if (expireValue === null || expireValue === undefined) {
+    updateData.member_expire = null;  // 清除会员
+  } else {
+    updateData.member_expire = expireValue;
+  }
+
+  await db.collection(USERS).doc(target._id).update({ data: updateData });
+
+  const isNowMember = expireValue && expireValue !== null;
+  console.log(`[admin_users.setMemberExpire] ${caller.openid} 设置 ${openid} member_expire=${expireValue} (${isNowMember ? '会员开通' : '会员清除'})`);
+
+  return reply(0, 'ok', { openid, member_expire: expireValue });
+}
+
+// ================================================================
 // 主入口
 // ================================================================
 exports.main = async (event, context) => {
@@ -266,6 +304,7 @@ exports.main = async (event, context) => {
     setStatus: actionSetStatus,
     delete: actionDelete,
     setRole: actionSetRole,
+    setMemberExpire: actionSetMemberExpire,
   };
 
   const handler = handlers[action];

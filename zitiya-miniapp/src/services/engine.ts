@@ -7,11 +7,13 @@ import type { IntentRule } from '@/data/intents';
 import { chatCompletion, extractJSON } from '@/services/llm';
 import { useAppStore } from '@/store/useAppStore';
 import { funnelForEngine } from '@/services/quoteFunnel';
-import { getKeywordsFor, getAllIntentRules, getPrompt, getModelParams, initCloudConfig, initUserQuotes, getAllUserQuotes } from '@/services/sceneConfig';
+import { getKeywordsFor, getAllIntentRules, getPrompt, getModelParams, initCloudConfig, initUserQuotes, getAllUserQuotes, getAllFixedQuotes, getAllKeywordMap } from '@/services/sceneConfig';
 import { filterResponses } from '@/services/contentFilter';
 import { matchInDailyPool, hasDailyPool } from '@/services/dailyIntentPool';
+import { loadDailyCache } from '@/services/quoteCache';
 import type { Quote } from '@/data/quotes';
 import { logger } from '@/utils/logger';
+import { authStore } from '@/store/useUserStore';
 
 const VALID_STYLES: ResponseStyle[] = ['gentle', 'humor', 'direct', 'counter'];
 
@@ -99,6 +101,58 @@ async function llmAnalyze(utterance: string, hintIntents?: string[]): Promise<Om
 }
 
 // ============ 本地规则引擎 ============
+
+/** 按 style 去重：每种风格只保留第一条，丢弃同风格重复项 */
+function dedupResponsesByStyle(responses: Response[]): Response[] {
+  const seen = new Set<ResponseStyle>();
+  const out: Response[] = [];
+  for (const r of responses) {
+    if (!seen.has(r.style)) {
+      seen.add(r.style);
+      out.push(r);
+    }
+  }
+  return out;
+}
+
+/**
+ * 从固定库 + 每日库捞出和原话/意图相关的金句文本，作为换说法备选池
+ * 用于：rule 响应注入 variants、rephrase 优先从语录库找
+ */
+function collectQuoteVariants(utterance: string, intentKey?: string, excludeSet?: Set<string>): string[] {
+  const kwMap = getAllKeywordMap();
+  const all: Quote[] = [...getAllFixedQuotes()];
+  const daily = loadDailyCache()?.quotes || [];
+  for (const q of daily) all.push(q);
+
+  const result: string[] = [];
+  const seen = new Set<string>(excludeSet || []);
+  for (const q of all) {
+    if (!q.content || q.content.length < 6) continue;
+    if (seen.has(q.content)) continue;
+
+    // 匹配：intent_key 精确命中 / keywords 命中 / 原话关键词和语录有交集
+    let hit = false;
+    if (intentKey && q.intent_key === intentKey) hit = true;
+    if (!hit) for (const kw of q.keywords || []) {
+      if (kw && utterance.includes(kw)) { hit = true; break; }
+    }
+    if (!hit) {
+      for (const kws of Object.values(kwMap)) {
+        for (const kw of kws) {
+          if (kw && utterance.includes(kw) && q.content.includes(kw)) { hit = true; break; }
+        }
+        if (hit) break;
+      }
+    }
+
+    if (hit) {
+      seen.add(q.content);
+      result.push(q.content.trim());
+    }
+  }
+  return result;
+}
 
 // 单个关键词集在输入文本里的命中数
 function countHits(text: string, keywords: string[]): number {
@@ -355,11 +409,20 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
           baseResult.intent = l2IntentNames;
         }
         source = 'llm';
+        authStore.deductPoints();  // 乐观扣积分（llm_proxy 云端已扣）
         logger.debug(`[Engine] L2+L3 LLM 完成, 总耗时 ${Date.now() - startTime}ms`);
-      } catch (err) {
-        logger.error('[Engine] L2+L3 LLM 失败, 降级规则模板:', err instanceof Error ? err.message : err);
-        baseResult = ruleAnalyze(text, fixedRule, l2IntentNames);
-        source = 'fallback';
+      } catch (err: any) {
+        const msg = err?.message || String(err);
+        const isQuota = err?.code === 429 || msg.includes('积分不足') || msg.includes('积分为空');
+        if (isQuota) {
+          logger.warn('[Engine] L2+L3 LLM 积分为空, 降级规则模板:', msg);
+          baseResult = ruleAnalyze(text, fixedRule, l2IntentNames);
+          source = 'quota_exceeded';
+        } else {
+          logger.error('[Engine] L2+L3 LLM 失败, 降级规则模板:', msg);
+          baseResult = ruleAnalyze(text, fixedRule, l2IntentNames);
+          source = 'fallback';
+        }
       }
     } else {
       // 无 LLM：daily 自带可用金句就追加到回话末尾
@@ -383,12 +446,13 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
         baseResult.intent = ['未识别场景'];
       }
       source = 'llm';
+      authStore.deductPoints();  // 乐观扣积分（llm_proxy 云端已扣）
       logger.debug(`[Engine] L3 LLM 完成, 总耗时 ${Date.now() - startTime}ms`);
     } catch (err: any) {
       const msg = err?.message || String(err);
-      // 429 次数超限：降级兜底，但把错误信息透给 UI 做提示
-      if (msg.includes('429') || msg.includes('已用完')) {
-        logger.warn('[Engine] LLM 次数已用完, 降级万能兜底:', msg);
+      const isQuota = err?.code === 429 || msg.includes('积分不足') || msg.includes('积分为空');
+      if (isQuota) {
+        logger.warn('[Engine] LLM 积分为空, 降级万能兜底:', msg);
         baseResult = ruleAnalyze(text, fixedRule, ['未识别场景']);
         source = 'quota_exceeded';
       } else {
@@ -404,20 +468,16 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
     source = 'fallback_no_llm';
   }
 
-  // ========== 把语录漏斗命中的推荐金句追加到 responses 末尾 ==========
+  // ========== 最终 responses：按 style 去重，每种风格只保留第一条 ==========
+  baseResult.responses = dedupResponsesByStyle(baseResult.responses);
+  logger.debug(`[Engine] 去重后 responses: ${baseResult.responses.length} 条（每种 style 一条）`);
+
+  // ========== 语录漏斗金句不再注入 variants ==========
+  // 之前错误地把同一条金句注入到所有 4 种 style 的 variants 里，导致
+  // 所有风格的换说法看起来都在切同样的内容（金句不区分风格，污染了各 style 自己的 variants）
+  // 现在每种 style 的 variants 只来自 rule 内置的，保持纯粹
   if (funnelHit?.quotes?.length) {
-    const existingTexts = new Set(baseResult.responses.map((r) => r.text));
-    const extras = funnelHit.quotes
-      .filter((q) => q.source !== 'user')            // 我的语录改由专属卡片展示，不重复塞进回话
-      .filter((q) => !existingTexts.has(q.content))   // 去重
-      .slice(0, 2)                                   // 最多加 2 条推荐金句
-      .map((q, i) => ({
-        id: `${Date.now()}_funnel_${i}`,
-        style: 'gentle' as ResponseStyle,
-        text: q.content,
-        reason: `${funnelSourceTag} · 推荐金句`,
-      }));
-    baseResult.responses = [...baseResult.responses, ...extras];
+    logger.debug(`[Engine] 语录漏斗命中 ${funnelHit.quotes.length} 条金句（独立展示，不注入各 style variants）`);
   }
 
   // ========== 内容安全审查（只拦截，不额外补内容） ==========
@@ -461,14 +521,31 @@ export async function analyzeUtterance(utterance: string): Promise<AnalysisResul
 // 工具：给 sourceLabel 用（IntentCard 展示层自己映射）
 // source 可能是 rule / llm / fallback / rule_with_funnel_fixed / rule_with_funnel_daily / rule_with_funnel_ai
 
-// 换说法：对单条回话生成变体（LLM 优先，降级取内置备选）
+// 换说法：对单条回话生成变体（只在同风格内部换措辞）
+// 轮换链：
+//   1) 同 style 的 variants 轮换（rule 内置的 + engine 注入的语录金句）
+//   2) LLM 生成（只换措辞，保持相同风格，最费积分）
+//
+// 注意：绝不能跳到其他 style（用户要的是"温和化解的另一种说法"，不是跳到幽默风格）
 export async function rephraseResponse(
   utterance: string,
   response: Response,
   currentText: string
 ): Promise<string> {
   logger.debug('[API] engine.rephraseResponse ← 入口, 风格', response.style);
-  // 确保全局模型配置已加载，否则未配个人模型的用户无法走全局 LLM 换说法
+
+  // ---------- 1) 同 style 的 variants 轮换 ----------
+  const variants = response.variants || [];
+  if (variants.length > 0) {
+    const idx = variants.indexOf(currentText);
+    const next = variants[(idx + 1) % variants.length];
+    if (next && next !== currentText) {
+      logger.debug('[Engine] 换说法 ✅ 同 style variants');
+      return next;
+    }
+  }
+
+  // ---------- 2) LLM 生成（保持同风格，只换措辞） ----------
   await useAppStore.getState().initGlobalLLM();
   const cfg = useAppStore.getState().getActiveLLM();
   if (cfg) {
@@ -494,23 +571,27 @@ export async function rephraseResponse(
         { tag: '换说法', ...getModelParams('rephrase') }
       );
       const payload = extractJSON<{ text?: string }>(raw);
-      if (payload && payload.text && payload.text.trim()) {
-        logger.debug('[Engine] 换说法成功(LLM)');
-        return payload.text.trim();
+      // 防呆：过滤 LLM 把 JSON 示例里的占位符当正文返回
+      const PLACEHOLDERS = new Set(['改写后的回话', '改写后的内容', '文本内容', '这里是文本', '示例文本']);
+      const text = (payload?.text || '').trim();
+      if (text && !PLACEHOLDERS.has(text) && text.length >= 4) {
+        logger.debug('[Engine] 换说法 ✅ LLM 生成');
+        return text;
       }
-      logger.error('[Engine] 换说法解析失败', { len: (raw || '').length });
-    } catch (err) {
-      logger.error('[Engine] 换说法 LLM 调用失败:', err instanceof Error ? err.message : err);
+      logger.error('[Engine] 换说法 LLM 返回无效', { raw: (raw || '').slice(0, 100), text });
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      const isQuota = err?.code === 429 || msg.includes('积分不足') || msg.includes('积分为空');
+      if (isQuota) {
+        logger.warn('[Engine] 换说法积分为空:', msg);
+        throw err;  // 抛给上层，让 UI 弹提示
+      }
+      logger.error('[Engine] 换说法 LLM 调用失败:', msg);
     }
   }
-  // 降级：从内置备选轮换
-  const variants = response.variants || [];
-  if (variants.length > 0) {
-    const idx = variants.indexOf(currentText);
-    const next = variants[(idx + 1) % variants.length];
-    logger.debug('[Engine] 换说法成功(规则备选)');
-    return next;
-  }
+
+  // 全部失败：原样返回
+  logger.warn('[Engine] 换说法所有渠道都失败，原样返回');
   return currentText;
 }
 

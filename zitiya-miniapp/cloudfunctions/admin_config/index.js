@@ -26,13 +26,13 @@ const ALLOWED_SECTIONS = {
   crawl_topics: 'array',
   daily_quote_limit: 'number',
   daily_quote_ttl_days: 'number',
-  llm_daily_limit: 'number',
   api_base: 'string',
   prompts: 'object',
   model_params: 'object',
   presets: 'array',
   attack_scenes: 'array',
   attack_categories: 'array',
+  points: 'object',          // 积分规则 { initial_bonus, daily_checkin }
 };
 
 // ================================================================

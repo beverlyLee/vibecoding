@@ -48,6 +48,45 @@
   margin-top: 6rpx;
 }
 
+// 未登录积分吸引条
+.loginBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #fff5eb 0%, #ffe3c7 100%);
+  border: 1rpx solid #ffcf9e;
+  border-radius: $radius-xl;
+  padding: 20rpx 28rpx;
+  margin: 8rpx 0 24rpx;
+  box-shadow: $shadow-card;
+}
+
+.loginBannerText {
+  font-size: $font-size-sm;
+  color: #b5651d;
+  flex: 1;
+}
+
+.loginBannerHighlight {
+  font-weight: $font-weight-semibold;
+  color: #e8651a;
+}
+
+.loginBannerBtn {
+  background: linear-gradient(135deg, #ff8c3a 0%, #e8651a 100%);
+  border-radius: $radius-round;
+  padding: 12rpx 32rpx;
+  box-shadow: 0 4rpx 12rpx rgba(232, 101, 26, 0.3);
+
+  &:active { opacity: 0.85; }
+}
+
+.loginBannerBtnText {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-semibold;
+  color: #ffffff;
+}
+
 .welcomeCard {
   background: linear-gradient(135deg, #f4f8ff 0%, #eaf1ff 100%);
   border: 1rpx solid $color-border;
@@ -305,18 +344,66 @@
   margin-bottom: $spacing-md;
 }
 
-.resultHeader {
+// 鸭鸭结论条
+.heroBanner {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   margin-bottom: $spacing-md;
-  padding: 0 8rpx;
+  padding: 24rpx 28rpx;
+  background: linear-gradient(135deg, #fff6e6 0%, #ffe9ec 100%);
+  border: 1rpx solid #ffdca8;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-card;
+  overflow: hidden;
 }
 
-.resultTitle {
-  font-size: $font-size-lg;
-  font-weight: $font-weight-semibold;
-  color: $color-text-primary;
+.heroDuck {
+  width: 108rpx;
+  height: 108rpx;
+  flex-shrink: 0;
+  margin-right: $spacing-md;
+  border-radius: $radius-round;
+  background: #ffffff;
+  padding: 8rpx;
+  box-sizing: border-box;
+  box-shadow: 0 6rpx 18rpx rgba(232, 140, 60, 0.18);
+}
+
+.heroTexts {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.heroTitle {
+  font-size: $font-size-md;
+  font-weight: $font-weight-bold;
+  color: #a8591a;
+  line-height: 1.4;
+}
+
+.heroSub {
+  font-size: $font-size-sm;
+  color: #b06a2e;
+  margin-top: 8rpx;
+  line-height: 1.4;
+}
+
+.heroNum {
+  font-size: $font-size-xl;
+  font-weight: $font-weight-bold;
+  color: #e8651a;
+  padding: 0 4rpx;
+}
+
+.heroSpark {
+  position: absolute;
+  top: 12rpx;
+  right: 20rpx;
+  font-size: 32rpx;
+  opacity: 0.8;
 }
 
 // 友好页脚

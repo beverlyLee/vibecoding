@@ -71,6 +71,10 @@ export default function ProfilePage() {
     Taro.navigateTo({ url: '/pages/privacy/index' });
   };
 
+  const handleCheckin = () => {
+    Taro.navigateTo({ url: '/pages/checkin/index' });
+  };
+
   const handleLogout = () => {
     logout();
   };
@@ -149,6 +153,20 @@ export default function ProfilePage() {
         </View>
 
         {/* 菜单组 */}
+        <View className={styles.sectionTitle}>每日签到</View>
+        <View className={styles.menuCard}>
+          <View className={styles.menuItem} onClick={handleCheckin}>
+            <View className={`${styles.menuIcon} ${styles.menuIconCheckin}`}>🪙</View>
+            <Text className={styles.menuLabel}>每日签到</Text>
+            {user?.has_checked_today ? (
+              <Text className={[styles.menuValue, styles.menuValueDone]}>今日已签到</Text>
+            ) : (
+              <Text className={[styles.menuValue, styles.menuValueTodo]}>可领 +{user?.daily_checkin_reward ?? (isStaff ? 5 : 5)}</Text>
+            )}
+            <Text className={styles.menuArrow}>›</Text>
+          </View>
+        </View>
+
         {isStaff && (
           <>
             <View className={styles.sectionTitle}>功能</View>

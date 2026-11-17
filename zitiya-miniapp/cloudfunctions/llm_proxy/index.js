@@ -11,6 +11,7 @@
 const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
+const _ = db.command;
 
 const http = require('http');
 const https = require('https');
@@ -21,73 +22,22 @@ function logf(level, msg) {
 }
 
 // ================================================================
-// LLM 每日次数限制（所有 LLM 调用的统一拦截点）
-// 规则：
-//   1. scene_config.main.llm_daily_limit 配置上限（默认 5），0 或负数 = 不限
-//   2. admin / operator 角色不受限
-//   3. 按自然日计数，跨天自动重置
-//   4. users 集合字段：llm_calls_date / llm_calls_today / llm_calls_total
+// 积分检查（代理给 user_points 云函数，职责单一）
 // ================================================================
-
-function todayStr() {
-  const d = new Date();
-  const p = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-
-async function checkAndConsumeQuota() {
+async function checkAndConsumePoints() {
   const ctx = cloud.getWXContext();
   const openid = ctx.OPENID;
-  if (!openid) return { ok: true }; // 无身份（内部调用 / test），放行
-
-  // 1. 读取全局 limit 配置
-  let dailyLimit = 5;
+  if (!openid) return { ok: true };
   try {
-    const cfg = await db.collection('scene_config').doc('main').get();
-    const v = cfg.data && cfg.data.llm_daily_limit;
-    if (typeof v === 'number') dailyLimit = v;
+    // 显式传 openid：嵌套调用 user_points 时它的 cloud.getWXContext 拿不到
+    const res = await cloud.callFunction({ name: 'user_points', data: { action: 'deduct', openid } });
+    const r = res.result || {};
+    if (r.code === 0) return { ok: true };
+    return { ok: false, code: r.code || 429, message: r.message || '积分不足' };
   } catch (e) {
-    // 配置不存在 → 用默认 5
+    logf('error', `积分检查异常，放行: ${e && e.message}`);
+    return { ok: true };
   }
-  if (dailyLimit <= 0) return { ok: true }; // 0 或负数 = 不限
-
-  // 2. 查用户身份 + 今日次数
-  let user;
-  try {
-    const res = await db.collection('users').where({ openid }).limit(1).get();
-    user = res.data[0];
-  } catch (e) {
-    return { ok: true }; // users 集合不存在或查失败 → 放行（首次使用时）
-  }
-  if (!user) return { ok: true }; // 未注册用户放行（注册后自然受限）
-  if (user.role === 'admin' || user.role === 'operator') return { ok: true }; // 运营/管理员不限
-
-  const today = todayStr();
-  const lastDate = user.llm_calls_date || '';
-  const prevCount = lastDate === today ? (user.llm_calls_today || 0) : 0;
-
-  if (prevCount >= dailyLimit) {
-    logf('warn', `用户 ${openid} 今日 LLM 调用已用完 ${prevCount}/${dailyLimit}`);
-    return { ok: false, code: 429, message: `今日 LLM 调用次数已用完（${prevCount}/${dailyLimit}），明天再来吧~` };
-  }
-
-  // 3. 扣减（+1）
-  try {
-    const newCount = prevCount + 1;
-    await db.collection('users').doc(user._id).update({
-      data: {
-        llm_calls_date: today,
-        llm_calls_today: newCount,
-        llm_calls_total: (user.llm_calls_total || 0) + 1,
-      },
-    });
-    logf('info', `用户 ${openid} 今日 LLM ${newCount}/${dailyLimit} (今日) 总 ${(user.llm_calls_total || 0) + 1}`);
-  } catch (e) {
-    logf('error', `扣减次数失败: ${e && e.message}`);
-    // 扣减失败不阻断调用（避免 DB 抖动影响 LLM 可用性）
-  }
-
-  return { ok: true };
 }
 
 // 从 Responses API 的 output 数组中提取 assistant 文本
@@ -169,9 +119,9 @@ function requestJSON(targetUrl, headers, bodyObj, timeoutMs) {
 
 exports.main = async (event) => {
   // ================================================================
-  // 0. LLM 每日次数限制（最前置拦截）
+  // 0. LLM 积分检查（最前置拦截）
   // ================================================================
-  const quota = await checkAndConsumeQuota();
+  const quota = await checkAndConsumePoints();
   if (!quota.ok) {
     return { code: quota.code, message: quota.message, data: null };
   }
@@ -251,7 +201,11 @@ exports.main = async (event) => {
     };
   } else {
     headers['Authorization'] = `Bearer ${resolvedKey}`;
-    body = { model: resolvedModel, messages, temperature, max_tokens: maxTokens, stream: false };
+    // economy / lite 类模型可能不接受过大的 max_tokens，加个上限保护
+    const safeMaxTokens = maxTokens ? Math.min(Math.max(maxTokens, 32), 4096) : undefined;
+    body = { model: resolvedModel, messages, temperature };
+    if (safeMaxTokens) body.max_tokens = safeMaxTokens;
+    body.stream = false;
   }
 
   logf('info', `转发 ${protocol} -> ${targetUrl} model=${model}`);
@@ -301,12 +255,51 @@ exports.main = async (event) => {
       if (!text && json && json.choices && json.choices[0] && typeof json.choices[0].content === 'string') {
         text = json.choices[0].content;
       }
+      // 优先级5：reasoning_content（豆包推理模型可能把正文放在这里）
+      if (!text && json && json.choices && json.choices[0] && json.choices[0].message) {
+        const m = json.choices[0].message;
+        if (m.reasoning_content && typeof m.reasoning_content === 'string') text = m.reasoning_content;
+      }
+      // 优先级6：tool_calls / function_call 的 arguments 里有内容
+      if (!text && json && json.choices && json.choices[0] && json.choices[0].message) {
+        const m = json.choices[0].message;
+        if (m.tool_calls && Array.isArray(m.tool_calls)) {
+          text = m.tool_calls.map((t) => {
+            const args = t.function && t.function.arguments;
+            return typeof args === 'string' ? args : JSON.stringify(args);
+          }).join('\n');
+        }
+      }
+      // 优先级7：choices[0].delta.content（流式非流式混用？）
+      if (!text && json && json.choices && json.choices[0] && json.choices[0].delta) {
+        if (typeof json.choices[0].delta.content === 'string') text = json.choices[0].delta.content;
+      }
+      // 优先级8：choices[0].message.content 是数组（多模态）
+      if (!text && json && json.choices && json.choices[0] && json.choices[0].message && Array.isArray(json.choices[0].message.content)) {
+        text = json.choices[0].message.content
+          .filter((c) => c.type === 'text' && typeof c.text === 'string')
+          .map((c) => c.text)
+          .join('\n');
+      }
     }
     if (!text) {
       // 完整打印原始响应体（不截断），便于排查豆包等厂商的非标准返回
       const rawStr = JSON.stringify(json);
       logf('error', `模型响应为空，HTTP status=${status}, 完整响应体长度=${rawStr.length}`);
       logf('error', `完整响应体内容: ${rawStr}`);
+      // 额外打印前几层 key，快速判断格式
+      if (json && typeof json === 'object') {
+        logf('error', `响应顶层 keys: ${Object.keys(json).join(',')}`);
+        if (json.choices && json.choices[0]) {
+          const c0 = json.choices[0];
+          logf('error', `choices[0] keys: ${Object.keys(c0).join(',')}`);
+          if (c0.message) logf('error', `choices[0].message keys: ${Object.keys(c0.message).join(',')}`);
+          if (c0.delta) logf('error', `choices[0].delta keys: ${Object.keys(c0.delta).join(',')}`);
+        }
+        if (json.output && Array.isArray(json.output) && json.output[0]) {
+          logf('error', `output[0] keys: ${Object.keys(json.output[0]).join(',')}`);
+        }
+      }
       return { code: 1, message: '模型响应为空（HTTP 200 但内容体无 choices[0].message.content），请检查 baseURL / model 配置', data: null };
     }
     return { code: 0, message: 'ok', data: { text, usage } };

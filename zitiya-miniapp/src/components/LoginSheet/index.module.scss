@@ -22,6 +22,34 @@
   to { transform: translateY(0); }
 }
 
+.bonusBanner {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 20rpx 28rpx;
+  margin-bottom: 36rpx;
+  background: linear-gradient(135deg, rgba(255, 183, 77, 0.15), rgba(255, 138, 76, 0.12));
+  border: 1rpx solid rgba(255, 138, 76, 0.3);
+  border-radius: 20rpx;
+}
+
+.bonusEmoji {
+  font-size: 36rpx;
+  flex-shrink: 0;
+}
+
+.bonusText {
+  flex: 1;
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  line-height: 1.5;
+}
+
+.bonusHighlight {
+  font-weight: $font-weight-semibold;
+  color: #ff8a4c;
+}
+
 .privacyRow {
   display: flex;
   align-items: center;

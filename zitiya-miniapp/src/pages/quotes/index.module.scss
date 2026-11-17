@@ -436,3 +436,47 @@
   opacity: 0.6;
   pointer-events: none;
 }
+
+// ========== 语录页改版：分类 emoji / 空态鸭鸭 / 筛选区减负 ==========
+// 后定义覆盖前面同名的间距值，让卡片更早出现在首屏
+
+.chipEmoji {
+  margin-right: 8rpx;
+  font-size: $font-size-md;
+}
+
+.filterBar { margin-bottom: $spacing-sm; }
+.tabBar { margin-bottom: $spacing-md; }
+.searchBar { margin-bottom: $spacing-sm; }
+.countTip { margin-bottom: $spacing-sm; }
+
+.emptyDuck {
+  display: block;
+  width: 140rpx;
+  height: 140rpx;
+  margin: 0 auto 24rpx;
+  border-radius: $radius-lg;
+  background: $color-bg-card;
+  padding: 12rpx;
+  box-sizing: border-box;
+  box-shadow: $shadow-card;
+}
+
+.emptyTexts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.emptyTitle {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+  margin-bottom: 12rpx;
+}
+
+.emptyDesc {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+  line-height: $line-height-normal;
+}

@@ -1,8 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, ScrollView, Input, Image } from '@tarojs/components';
 import Taro, { useDidShow } from '@tarojs/taro';
-import QuoteCard from '@/components/QuoteCard';
-import EmptyState from '@/components/EmptyState';
+import QuoteCard, { QUOTE_CATEGORY_META } from '@/components/QuoteCard';
 import AddUserQuoteSheet from './AddQuoteSheet';
 import { QUOTE_CATEGORIES } from '@/data/quotes';
 import type { Quote } from '@/data/quotes';
@@ -13,6 +12,7 @@ import { ensureDailyQuotes } from '@/services/quoteCache';
 import { invalidateUserQuotes } from '@/services/sceneConfig';
 import { useLoginSheet } from '@/hooks/useLoginSheet';
 import logoDuck from '@/assets/logo.png';
+import PointsBar from '@/components/PointsBar';
 import styles from './index.module.scss';
 
 type Tab = 'all' | 'mine';
@@ -158,8 +158,9 @@ export default function QuotesPage() {
         <Image className={styles.duck} src={logoDuck} mode='aspectFit' />
         <View className={styles.heroTexts}>
           <Text className={styles.heroTitle}>现成嘴替</Text>
-          <Text className={styles.heroDesc}>看到合适的直接点「拿去练手」，鸭鸭帮你现场拆解</Text>
+          <Text className={styles.heroDesc}>挑一句，复制了就能发</Text>
         </View>
+        <PointsBar />
       </View>
 
       {/* Tab 切换：全部 / 我的 */}
@@ -201,20 +202,25 @@ export default function QuotesPage() {
       {/* 分类筛选 */}
       <View className={styles.filterBar}>
         <ScrollView scrollX className={styles.filterScroll} enhanced showScrollbar={false}>
-          {QUOTE_CATEGORIES.map((c) => (
-            <Text
-              key={c}
-              className={[styles.chip, category === c && styles.chipActive].filter(Boolean).join(' ')}
-              onClick={() => setCategory(c)}
-            >
-              {c}
-            </Text>
-          ))}
+          {QUOTE_CATEGORIES.map((c) => {
+            const meta = QUOTE_CATEGORY_META[c] || QUOTE_CATEGORY_META['全部'];
+            const active = category === c;
+            return (
+              <Text
+                key={c}
+                className={[styles.chip, active && styles.chipActive].filter(Boolean).join(' ')}
+                style={active ? { backgroundColor: meta.color, borderColor: meta.color } : {}}
+                onClick={() => setCategory(c)}
+              >
+                <Text className={styles.chipEmoji}>{meta.emoji}</Text>{c}
+              </Text>
+            );
+          })}
         </ScrollView>
       </View>
 
       <Text className={styles.countTip}>
-        共 {filteredQuotes.length} 条 {tab === 'mine' ? '我的语录' : '语录'}
+        共 {filteredQuotes.length} 条{tab === 'mine' ? '我存的' : '现成嘴替'}
         {locked && ` · 免费看前 ${FREE_LIMIT} 条`}
       </Text>
 
@@ -233,16 +239,20 @@ export default function QuotesPage() {
           {locked && (
             <View className={styles.lockedCard} onClick={() => requireLogin('查看更多语录')}>
               <Text className={styles.lockedTitle}>🔒 还有 {hiddenCount} 条语录等你解锁</Text>
-              <Text className={styles.lockedDesc}>登录后查看完整语录库，覆盖更多沟通场景</Text>
+              <Text className={styles.lockedDesc}>登录后解锁全部现成嘴替，覆盖更多沟通场景</Text>
               <Text className={styles.lockedBtn}>去登录 →</Text>
             </View>
           )}
         </>
       ) : (
         <View className={styles.emptyList}>
+          <Image className={styles.emptyDuck} src={logoDuck} mode='aspectFit' />
           {tab === 'mine' ? (
             loggedIn ? (
-              <EmptyState title='还没有语录' desc='点击右下角 ➕ 把你用过的好话术记下来吧' />
+              <View className={styles.emptyTexts}>
+                <Text className={styles.emptyTitle}>口袋还空着呢</Text>
+                <Text className={styles.emptyDesc}>点右下角 ➕，把用过的好话术存进来</Text>
+              </View>
             ) : (
               <View className={styles.emptyLoginTip}>
                 <Text>登录后可以保存专属语录</Text>
@@ -252,7 +262,10 @@ export default function QuotesPage() {
               </View>
             )
           ) : (
-            <EmptyState title='暂无语录' desc='换个关键词或分类看看吧' />
+            <View className={styles.emptyTexts}>
+              <Text className={styles.emptyTitle}>这句鸭鸭还没备好</Text>
+              <Text className={styles.emptyDesc}>换个关键词或分类再翻翻</Text>
+            </View>
           )}
         </View>
       )}

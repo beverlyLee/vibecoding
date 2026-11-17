@@ -100,7 +100,7 @@ export async function funnelForBrowse(searchKeyword?: string): Promise<Quote[]> 
         q.content.includes(kw) ||
         q.category.includes(kw) ||
         (q.keywords?.some((k) => k.includes(kw)) ?? false) ||
-        q.note.includes(kw)
+        (q.note?.includes(kw) ?? false)
     );
   }
 

@@ -43,3 +43,7 @@ export function adminDelete(openid: string): Promise<{ openid: string }> {
 export function adminSetRole(openid: string, role: 'user' | 'operator' | 'admin'): Promise<{ openid: string; role: string }> {
   return call<{ openid: string; role: string }>('setRole', { openid, role });
 }
+
+export function adminSetMemberExpire(openid: string, member_expire: string | null): Promise<{ openid: string; member_expire: string | null }> {
+  return call<{ openid: string; member_expire: string | null }>('setMemberExpire', { openid, member_expire });
+}

@@ -8,6 +8,9 @@
 //
 // 鉴权：所有身份通过 getWXContext().OPENID 获取，绝不接受客户端传入
 // 冷启动：users 集合为空时，第一个 login 的用户自动 admin
+//
+// 积分逻辑：内联，双表 user_points 主表 + points_transactions 流水表
+// 主表 _.inc + where 原子更新保证幂等并发安全
 
 const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
@@ -15,20 +18,48 @@ const db = cloud.database();
 const _ = db.command;
 
 const USERS = 'users';
+const MAIN = 'user_points';
+const TX = 'points_transactions';
+const SCENE_CONFIG = 'scene_config';
 
 // ================================================================
 // 工具函数
 // ================================================================
 
-function reply(code, message, data = null) {
-  return { code, message, data };
-}
+function reply(code, message, data = null) { return { code, message, data }; }
+function err(message, code = 1) { return reply(code, message, null); }
+function todayStr() { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; }
 
-function err(message, code = 1) {
-  return reply(code, message, null);
-}
+async function safeCount() { try { return (await db.collection(USERS).count()).total || 0; } catch (e) { return 0; } }
+async function findByOpenid(openid) { const res = await db.collection(USERS).where({ openid }).limit(1).get(); return res.data[0] || null; }
+function getOpenid(context) { const openid = cloud.getWXContext().OPENID; if (!openid) throw new Error('无法识别微信身份'); return openid; }
 
-function publicFields(row) {
+// ================================================================
+// 积分代理（所有积分逻辑在 user_points 云函数，这里只调它）
+// ================================================================
+async function callPoints(action, data) {
+  const ctx = cloud.getWXContext();
+  const openid = ctx.OPENID;
+  try {
+    const payload = { action, openid, ...(data || {}) };
+    console.log(`[user.points] → 调用 user_points.${action} openid=${openid}`);
+    const res = await cloud.callFunction({ name: 'user_points', data: payload });
+    console.log(`[user.points] ← user_points.${action} 结果:`, JSON.stringify(res.result));
+    return res.result;
+  } catch (e) {
+    console.error(`[user.points] ✘ 调用 user_points.${action} 异常:`, e && e.message);
+    return { code: 500, message: e && e.message };
+  }
+}
+async function callPointsRefresh() { const r = await callPoints('refresh'); return r && r.code === 0 ? r.data : { points: 0 }; }
+async function callPointsQuery()  { const r = await callPoints('query');  return r && r.code === 0 ? r.data : { points: 0 }; }
+
+
+// ================================================================
+// publicFields
+// ================================================================
+
+function publicFields(row, pi) {
   if (!row) return null;
   return {
     _id: row._id,
@@ -40,34 +71,11 @@ function publicFields(row) {
     createdAt: row.createdAt,
     lastLoginAt: row.lastLoginAt,
     loginCount: row.loginCount || 0,
+    member_expire: row.member_expire || null,
+    points: pi?.points ?? 0,
+    has_checked_today: pi?.has_checked_today ?? false,
+    daily_checkin_reward: pi?.daily_checkin_reward ?? pi?.daily_add ?? 5,
   };
-}
-
-/** 从云数据库安全计数，避免空集合报错 */
-async function safeCount() {
-  try {
-    const res = await db.collection(USERS).count();
-    return res.total || 0;
-  } catch (e) {
-    // 集合不存在也当作 0
-    return 0;
-  }
-}
-
-/** 按 openid 查用户 */
-async function findByOpenid(openid) {
-  const res = await db.collection(USERS).where({ openid }).limit(1).get();
-  return res.data[0] || null;
-}
-
-/** 通用身份获取：从 getWXContext 取 OPENID，校验 */
-function getOpenid(context) {
-  const wxContext = cloud.getWXContext();
-  const openid = wxContext.OPENID;
-  if (!openid) {
-    throw new Error('无法识别微信身份，请重新进入小程序');
-  }
-  return openid;
 }
 
 // ================================================================
@@ -75,49 +83,38 @@ function getOpenid(context) {
 // ================================================================
 async function actionLogin(event, context) {
   const openid = getOpenid(context);
-
-  // 前端可选择性传入 nickname + avatar，新用户直接用；老用户也同步更新（比如换了个头像）
   const nickname = typeof event?.nickname === 'string' ? event.nickname.trim().slice(0, 32) : '';
   const avatar = typeof event?.avatar === 'string' && event.avatar.length <= 500 ? event.avatar : '';
-
   const existing = await findByOpenid(openid);
   const now = db.serverDate();
 
   if (existing) {
-    if (existing.status === 'banned') {
-      return err('账号已被封禁，请联系管理员', 403);
-    }
-    // 登录同时更新昵称/头像（如果前端传了）
+    if (existing.status === 'banned') return err('账号已被封禁，请联系管理员', 403);
+
+    // ① 更新登录行为（users 表的事）
     const patch = { lastLoginAt: now, loginCount: _.inc(1) };
     if (nickname) patch.nickname = nickname;
     if (avatar) patch.avatar = avatar;
     await db.collection(USERS).doc(existing._id).update({ data: patch });
 
-    const merged = { ...existing, ...patch, lastLoginAt: now, loginCount: (existing.loginCount || 0) + 1 };
-    return reply(0, 'ok', publicFields(merged));
+    // ② 积分交给 user_points 云函数（职责单一）
+    const pi = await callPointsRefresh();
+    return reply(0, 'ok', publicFields(existing, pi));
   }
 
-  // 新用户：冷启动时（集合为空）自动 admin
-  const total = await safeCount();
-  const autoAdmin = total === 0;
-
+  const autoAdmin = (await safeCount()) === 0;
   const newUser = {
-    openid,
-    nickname: nickname || '微信用户',
-    avatar: avatar || '',
-    role: autoAdmin ? 'admin' : 'user',
-    status: 'active',
-    createdAt: now,
-    lastLoginAt: now,
-    loginCount: 1,
+    openid, nickname: nickname || '微信用户', avatar: avatar || '',
+    role: autoAdmin ? 'admin' : 'user', status: 'active',
+    createdAt: now, lastLoginAt: now, loginCount: 1,
   };
-
   const addRes = await db.collection(USERS).add({ data: newUser });
   const saved = { ...newUser, _id: addRes._id };
+  console.log(`[user] 新用户 ${openid} role=${saved.role}${autoAdmin ? '(冷启动 admin)' : ''}`);
 
-  console.log(`[user] 新用户 ${openid} 登录，role=${saved.role}${autoAdmin ? '（冷启动自动 admin）' : ''}${nickname ? ` nickname=${nickname}` : ''}${avatar ? ' hasAvatar=true' : ''}`);
-
-  return reply(0, 'ok', publicFields(saved));
+  // ① 用户已建好（含 lastLoginAt）  ② 调 user_points 发注册赠（不再自动发每日签到）
+  const pi = await callPointsRefresh();
+  return reply(0, 'ok', publicFields(saved, pi));
 }
 
 // ================================================================
@@ -126,15 +123,12 @@ async function actionLogin(event, context) {
 async function actionMe(event, context) {
   const openid = getOpenid(context);
   const user = await findByOpenid(openid);
+  if (!user) return err('账号不存在，请重新登录', 404);
+  if (user.status === 'banned') return err('账号已被封禁', 403);
 
-  if (!user) {
-    return err('账号不存在，请重新登录', 404);
-  }
-  if (user.status === 'banned') {
-    return err('账号已被封禁', 403);
-  }
-
-  return reply(0, 'ok', publicFields(user));
+  // 积分交给 user_points（query = 只查，不发 daily_login）
+  const pi = await callPointsQuery();
+  return reply(0, 'ok', publicFields(user, pi));
 }
 
 // ================================================================
@@ -143,7 +137,6 @@ async function actionMe(event, context) {
 async function actionUpdateProfile(event, context) {
   const openid = getOpenid(context);
   const user = await findByOpenid(openid);
-
   if (!user) return err('账号不存在', 404);
   if (user.status === 'banned') return err('账号已被封禁', 403);
 
@@ -153,18 +146,11 @@ async function actionUpdateProfile(event, context) {
     const trimmed = nickname.trim().slice(0, 32);
     if (trimmed.length > 0) data.nickname = trimmed;
   }
-  if (typeof avatar === 'string' && avatar.length <= 500) {
-    data.avatar = avatar;
-  }
-
-  if (Object.keys(data).length === 0) {
-    return err('没有需要更新的字段', 400);
-  }
+  if (typeof avatar === 'string' && avatar.length <= 500) data.avatar = avatar;
+  if (Object.keys(data).length === 0) return err('没有需要更新的字段', 400);
 
   await db.collection(USERS).doc(user._id).update({ data });
-
-  const updated = { ...user, ...data };
-  return reply(0, 'ok', publicFields(updated));
+  return reply(0, 'ok', publicFields({ ...user, ...data }));
 }
 
 // ================================================================
@@ -173,17 +159,15 @@ async function actionUpdateProfile(event, context) {
 async function actionDeleteAccount(event, context) {
   const openid = getOpenid(context);
   const user = await findByOpenid(openid);
-
   if (!user) return err('账号不存在', 404);
-
-  // admin 不能自己删自己
-  if (user.role === 'admin') {
-    return err('管理员账号不能自行注销，请联系上级管理员', 400);
-  }
+  if (user.role === 'admin') return err('管理员账号不能自行注销', 400);
 
   await db.collection(USERS).doc(user._id).remove();
-  console.log(`[user] 账号已注销: ${openid} role=${user.role}`);
-
+  try {
+    const pRes = await db.collection(USER_POINTS).where({ openid }).limit(1).get();
+    if (pRes.data[0] && pRes.data[0]._id) await db.collection(USER_POINTS).doc(pRes.data[0]._id).remove();
+  } catch (e) {}
+  console.log(`[user] 账号已注销: ${openid}`);
   return reply(0, 'ok', { openid });
 }
 
@@ -192,19 +176,9 @@ async function actionDeleteAccount(event, context) {
 // ================================================================
 exports.main = async (event, context) => {
   const action = (event && event.action) || 'login';
-
-  const handlers = {
-    login: actionLogin,
-    me: actionMe,
-    updateProfile: actionUpdateProfile,
-    deleteAccount: actionDeleteAccount,
-  };
-
+  const handlers = { login: actionLogin, me: actionMe, updateProfile: actionUpdateProfile, deleteAccount: actionDeleteAccount };
   const handler = handlers[action];
-  if (!handler) {
-    return err(`未知 action: ${action}`, 400);
-  }
-
+  if (!handler) return err(`未知 action: ${action}`, 400);
   try {
     return await handler(event, context);
   } catch (e) {

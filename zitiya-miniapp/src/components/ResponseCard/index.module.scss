@@ -3,80 +3,155 @@
 .card {
   position: relative;
   background: $color-bg-card;
-  border: 1rpx solid $color-divider;
-  border-radius: $radius-lg;
-  box-shadow: $shadow-card;
+  border: 2rpx solid $color-divider;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-card-hover;
   overflow: hidden;
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 6rpx;
-    background: $color-gradient-primary;
-  }
 }
 
-.styleBar {
+// 风格身份条
+.head {
   display: flex;
   align-items: center;
-  padding: 20rpx 32rpx;
+  padding: 22rpx 28rpx;
+}
+
+.avatar {
+  width: 76rpx;
+  height: 76rpx;
+  border-radius: $radius-round;
+  background: #ffffff;
+  border: 2rpx solid;
+  @include flex-center;
+  margin-right: $spacing-md;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.06);
+}
+
+.avatarEmoji {
+  font-size: 42rpx;
+  line-height: 1;
+}
+
+.headTexts {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.styleName {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-bold;
+  line-height: 1.3;
 }
 
 .styleDesc {
   font-size: $font-size-xs;
-  color: $color-text-tertiary;
+  color: $color-text-secondary;
+  margin-top: 4rpx;
+}
+
+.rank {
+  padding: 8rpx 20rpx;
+  border-radius: $radius-round;
   margin-left: $spacing-sm;
 }
 
+.rankText {
+  font-size: $font-size-xs;
+  font-weight: $font-weight-bold;
+  color: #ffffff;
+}
+
+.body {
+  padding: 24rpx 28rpx 0;
+}
+
+// 一句口诀
+.mottoWrap {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 22rpx;
+  border-left: 6rpx solid $color-primary;
+  border-radius: 4rpx $radius-md $radius-md 4rpx;
+}
+
+.mottoIcon {
+  font-size: 30rpx;
+  margin-right: 12rpx;
+}
+
+.mottoText {
+  flex: 1;
+  font-size: $font-size-md;
+  font-weight: $font-weight-bold;
+  line-height: $line-height-normal;
+}
+
+// 回话正文（视觉主角）
+.quote {
+  position: relative;
+  margin-top: $spacing-md;
+  padding: 30rpx 28rpx 30rpx 40rpx;
+  background: #f7f9ff;
+  border-left: 8rpx solid $color-primary;
+  border-radius: 4rpx $radius-lg $radius-lg 4rpx;
+}
+
 .quoteMark {
-  display: block;
-  font-size: 48rpx;
+  position: absolute;
+  top: -8rpx;
+  left: 12rpx;
+  font-size: 64rpx;
   font-weight: $font-weight-bold;
   line-height: 1;
-  padding: 24rpx 32rpx 0;
-  height: 40rpx;
+  opacity: 0.35;
 }
 
 .text {
   display: block;
-  font-size: 32rpx;
+  font-size: 34rpx;
   font-weight: $font-weight-medium;
   color: $color-text-primary;
   line-height: $line-height-loose;
-  margin: 8rpx 32rpx 0;
-  padding: 24rpx 28rpx;
-  background: #f5f8ff;
-  border-radius: 4rpx $radius-lg $radius-lg $radius-lg;
-  border-left: 6rpx solid $color-primary;
 }
 
+// 为什么这么说（折叠）
 .reasonWrap {
-  margin: 24rpx 32rpx 0;
-  padding: 20rpx 24rpx;
-  background: $color-divider;
-  border-radius: $radius-md;
+  margin-top: $spacing-md;
+}
+
+.reasonHead {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18rpx 24rpx;
+  background: $color-bg-page;
+  border-radius: $radius-md;
 }
 
 .reasonLabel {
+  font-size: $font-size-sm;
+  color: $color-text-secondary;
+}
+
+.reasonToggle {
   font-size: $font-size-xs;
-  color: $color-text-tertiary;
-  margin-bottom: 8rpx;
+  color: $color-primary-dark;
+  font-weight: $font-weight-medium;
 }
 
 .reasonText {
+  display: block;
   font-size: $font-size-sm;
   color: $color-text-secondary;
-  line-height: $line-height-normal;
+  line-height: $line-height-loose;
+  padding: 16rpx 24rpx 4rpx;
 }
 
 .actions {
   display: flex;
-  padding: 24rpx 32rpx 32rpx;
+  padding: 24rpx 28rpx 28rpx;
   gap: $spacing-sm;
 }
 
@@ -85,7 +160,7 @@
   flex: 1;
   height: $button-height-md;
   border-radius: $radius-button;
-  font-size: $font-size-md;
+  font-size: $font-size-sm;
   color: $color-text-secondary;
   background: $color-divider;
   border: none;
@@ -98,7 +173,6 @@
 }
 
 .primaryBtn {
-  color: $color-on-primary;
-  background: $color-gradient-primary;
-  font-weight: $font-weight-semibold;
+  color: #ffffff;
+  font-weight: $font-weight-bold;
 }

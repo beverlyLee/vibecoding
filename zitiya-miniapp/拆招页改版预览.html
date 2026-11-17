@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>嘴替鸭 · 拆招页改版对照预览</title>
+<style>
+  :root{
+    --blue:#3b6cff; --blue-dark:#2a4fe0; --blue-light:#7c9bff;
+    --ink:#16213a; --ink2:#5a6678; --ink3:#98a2b3;
+    --line:#eef1f7; --page:#f4f7fb; --card:#ffffff;
+    --gentle:#00B42A; --gentle-bg:#E8FFEA;
+    --humor:#FF7D00; --humor-bg:#FFF3E8;
+    --direct:#F53F3F; --direct-bg:#FFECE8;
+    --counter:#722ED1; --counter-bg:#F5E8FF;
+    --coral:#e8655a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:linear-gradient(160deg,#eef3fc 0%,#e8ecf7 40%,#f3e9ef 100%);
+    min-height:100vh;color:var(--ink);padding:32px 16px 60px;
+    display:flex;flex-direction:column;align-items:center;
+  }
+  .head{width:100%;max-width:860px;text-align:center;margin-bottom:22px}
+  .head h1{font-size:24px;font-weight:800;letter-spacing:.5px}
+  .head p{font-size:13px;color:var(--ink2);margin-top:8px;line-height:1.7}
+  .switch{
+    display:inline-flex;background:#fff;border-radius:999px;padding:5px;margin-top:18px;
+    box-shadow:0 6px 22px rgba(31,56,112,.12);gap:4px;
+  }
+  .switch button{
+    border:0;background:transparent;font-size:14px;font-weight:700;color:var(--ink2);
+    padding:10px 26px;border-radius:999px;cursor:pointer;transition:.2s;font-family:inherit;
+  }
+  .switch button.on{background:linear-gradient(135deg,#4f8bff,#21c7e0);color:#fff;box-shadow:0 4px 12px rgba(59,108,255,.35)}
+  .stage{display:flex;gap:34px;align-items:flex-start;flex-wrap:wrap;justify-content:center;width:100%;max-width:900px}
+  .phone-wrap{display:flex;flex-direction:column;align-items:center}
+  .phone-label{font-size:13px;font-weight:700;color:var(--ink2);margin-bottom:12px;display:flex;align-items:center;gap:7px}
+  .phone-label .dot{width:9px;height:9px;border-radius:50%}
+  .phone{
+    width:340px;height:720px;background:var(--page);border-radius:38px;
+    border:9px solid #12203a;box-shadow:0 22px 60px rgba(20,35,70,.28);
+    overflow:hidden;position:relative;
+  }
+  .navbar{
+    height:52px;background:linear-gradient(180deg,#eef3fc,#eef3fc);
+    display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;
+    border-bottom:1px solid #e3eaf7;position:relative;
+  }
+  .navbar .dots{position:absolute;left:14px;display:flex;gap:5px}
+  .navbar .dots i{width:8px;height:8px;border-radius:50%;background:#c9d6ee;display:block}
+  .scroll{height:calc(100% - 52px);overflow-y:auto;padding:16px 14px 26px}
+  .scroll::-webkit-scrollbar{width:0}
+  .src-line{font-size:11px;color:var(--ink3);text-align:center;margin:2px 0 14px}
+
+  /* 原始输入气泡（两版共有） */
+  .orig{background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:14px;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+  .orig .k{font-size:11px;color:var(--ink3);margin-bottom:6px}
+  .orig .v{font-size:13px;color:var(--ink);line-height:1.6}
+
+  /* ============ 旧版 ============ */
+  .old .card0{background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:14px}
+  .old .h{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:12px}
+  .old .intent-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .old .chip{font-size:12px;color:var(--blue-dark);background:rgba(59,108,255,.1);padding:5px 14px;border-radius:999px}
+  .old .sit-title{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:8px}
+  .old .sit{font-size:12.5px;color:var(--ink2);line-height:1.85}
+  .old .resp{background:#fff;border-radius:14px;box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:14px;overflow:hidden}
+  .old .resp .bar{display:flex;align-items:center;padding:12px 16px}
+  .old .resp .tag{font-size:11px;font-weight:700;padding:3px 10px;border-radius:6px}
+  .old .resp .desc{font-size:11px;color:var(--ink3);margin-left:8px}
+  .old .resp .q{font-size:15px;color:var(--ink);line-height:1.8;padding:6px 16px 14px}
+  .old .resp .why{font-size:12px;color:var(--ink2);line-height:1.8;padding:0 16px 14px;border-top:1px dashed var(--line);padding-top:12px}
+  .old .resp .why .t{font-weight:600;color:var(--ink);display:block;margin-bottom:5px}
+  .old .btns{display:flex;gap:8px;padding:0 16px 16px}
+  .old .btns b{flex:1;text-align:center;font-size:12px;font-weight:600;padding:9px 0;border-radius:24px;background:#f1f4f9;color:var(--ink2)}
+  .old .btns b.main{background:linear-gradient(135deg,#4f8bff,#21c7e0);color:#fff}
+
+  /* ============ 新版 ============ */
+  .hero{
+    display:flex;align-items:center;gap:11px;position:relative;
+    background:linear-gradient(135deg,#fff6e6,#ffe9ec);border:1px solid #ffdca8;
+    border-radius:18px;padding:13px 14px;margin-bottom:14px;box-shadow:0 3px 12px rgba(0,0,0,.05);overflow:hidden;
+  }
+  .hero .duck{width:54px;height:54px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:34px;box-shadow:0 4px 12px rgba(232,140,60,.2);flex-shrink:0}
+  .hero .tx{flex:1;min-width:0}
+  .hero .t1{font-size:13px;font-weight:800;color:#a8591a;line-height:1.4}
+  .hero .t2{font-size:11.5px;color:#b06a2e;margin-top:4px}
+  .hero .t2 b{font-size:17px;color:#e8651a}
+  .hero .spark{position:absolute;top:8px;right:12px;font-size:16px}
+
+  .diag{background:#fff;border:1px solid var(--line);border-radius:18px;padding:15px 15px 11px;box-shadow:0 3px 12px rgba(0,0,0,.05);margin-bottom:14px}
+  .diag .dh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .diag .dh .l{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800}
+  .diag .badge{font-size:10.5px;font-weight:800;padding:4px 11px;border-radius:999px}
+  .diag .chips{display:flex;gap:7px;flex-wrap:wrap}
+  .diag .chip{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--blue-dark);background:linear-gradient(135deg,#f0f5ff,#eaf1ff);border:1px solid #dbe6ff;padding:5px 12px;border-radius:999px}
+  .meter{display:flex;align-items:center;gap:7px;margin:13px 2px 0}
+  .meter .ml{font-size:10.5px;color:var(--ink3)}
+  .meter .track{flex:1;display:flex;gap:5px}
+  .meter .seg{flex:1;height:7px;border-radius:999px;background:#eaeef5}
+  .meter .mv{font-size:10.5px;font-weight:700;min-width:48px;text-align:right}
+  .trans{background:linear-gradient(135deg,#fffaf2,#fff4e6);border:1px solid #ffe8c7;border-radius:12px;padding:12px 13px;margin-top:13px}
+  .trans .tk{font-size:10.5px;font-weight:700;color:#c8811f;margin-bottom:6px}
+  .trans .tv{font-size:12px;color:var(--ink2);line-height:1.75}
+  .trans .more{font-size:11px;font-weight:700;color:#d98a1f;margin-top:7px;cursor:pointer;display:inline-block}
+  .diag .foot{text-align:right;font-size:10.5px;color:var(--ink3);margin-top:9px}
+
+  .sack{background:#fff;border:2px solid;border-radius:18px;box-shadow:0 5px 18px rgba(0,0,0,.07);margin-bottom:14px;overflow:hidden}
+  .sack .head{display:flex;align-items:center;padding:12px 14px}
+  .sack .avatar{width:40px;height:40px;border-radius:50%;background:#fff;border:2px solid;display:flex;align-items:center;justify-content:center;font-size:23px;margin-right:10px;box-shadow:0 3px 9px rgba(0,0,0,.06);flex-shrink:0}
+  .sack .ht{flex:1;min-width:0}
+  .sack .hn{font-size:15px;font-weight:800;line-height:1.3}
+  .sack .hd{font-size:10.5px;color:var(--ink2);margin-top:2px}
+  .sack .rank{font-size:10.5px;font-weight:800;color:#fff;padding:5px 12px;border-radius:999px}
+  .sack .body{padding:12px 14px 0}
+  .sack .motto{display:flex;align-items:center;gap:8px;padding:9px 12px;border-left:4px solid;border-radius:4px 10px 10px 4px;font-size:12.5px;font-weight:800}
+  .sack .quote{position:relative;margin-top:12px;padding:16px 14px 16px 22px;background:#f7f9ff;border-left:5px solid;border-radius:4px 14px 14px 4px}
+  .sack .quote .qm{position:absolute;top:-10px;left:8px;font-size:40px;font-weight:800;opacity:.28}
+  .sack .quote .qt{font-size:15.5px;font-weight:600;color:var(--ink);line-height:1.75}
+  .sack .why{margin-top:12px}
+  .sack .why .rh{display:flex;align-items:center;justify-content:space-between;background:var(--page);border-radius:10px;padding:10px 12px;cursor:pointer}
+  .sack .why .rl{font-size:12px;color:var(--ink2)}
+  .sack .why .rt{font-size:11px;color:var(--blue-dark);font-weight:700}
+  .sack .why .rb{display:none;font-size:12px;color:var(--ink2);line-height:1.8;padding:10px 12px 2px}
+  .sack .why.open .rb{display:block}
+  .sack .btns{display:flex;gap:7px;padding:12px 14px 14px}
+  .sack .btns b{flex:1;text-align:center;font-size:11.5px;font-weight:600;padding:9px 0;border-radius:24px;background:#f1f4f9;color:var(--ink2);cursor:pointer}
+  .sack .btns b.main{color:#fff;font-weight:800}
+  .footer{text-align:center;font-size:10.5px;color:var(--ink3);margin-top:16px;line-height:1.7}
+
+  .toast{position:fixed;bottom:38px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(22,33,58,.92);color:#fff;font-size:13px;padding:11px 22px;border-radius:999px;opacity:0;transition:.25s;pointer-events:none;z-index:99}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .note{max-width:860px;margin-top:26px;background:#fff;border-radius:16px;padding:18px 22px;box-shadow:0 6px 24px rgba(31,56,112,.08);font-size:12.5px;color:var(--ink2);line-height:1.9}
+  .note b{color:var(--ink)}
+  .note ul{margin:8px 0 0 18px}
+  @media(max-width:760px){.stage{gap:20px}}
+</style>
+</head>
+<body>
+  <div class="head">
+    <h1>嘴替鸭 · 拆招页改版对照</h1>
+    <p>同一段「原话」，左边是改版前的样子，右边是这次改版后。点按钮可切换单看一版，卡片里的「看完整解读 / 看看门道 / 复制这句」都能点。</p>
+    <div class="switch">
+      <button id="both" class="on" onclick="setView('both')">并排对照</button>
+      <button id="old" onclick="setView('old')">只看旧版</button>
+      <button id="new" onclick="setView('new')">只看新版</button>
+    </div>
+  </div>
+
+  <div class="stage">
+    <!-- 旧版 -->
+    <div class="phone-wrap" id="wrap-old">
+      <div class="phone-label"><span class="dot" style="background:#c9d2e0"></span>改版前 · 纯文字卡片</div>
+      <div class="phone">
+        <div class="navbar"><div class="dots"><i></i><i></i><i></i></div>帮你拆招</div>
+        <div class="scroll old">
+          <div class="src-line">— 分析结果 —</div>
+          <div class="orig"><div class="k">对方说</div><div class="v">「这个周末你能不能加个班把方案赶出来？大家都挺忙的，就你比较有空。」</div></div>
+
+          <div class="card0">
+            <div class="sit-title">识别意图</div>
+            <div class="intent-row"><span class="chip">施压</span><span class="chip">道德绑架</span></div>
+            <div class="sit-title">对方为什么这么说</div>
+            <div class="sit">对方用「大家都挺忙」先把加班包装成集体处境，再用「就你比较有空」给你扣一个不帮忙就是不合群的帽子，本质是把自己的排期压力转嫁给你，让你不好意思拒绝。这类话的重点不在方案本身，而在用情面替你做了决定。</div>
+            <div style="text-align:right;font-size:10.5px;color:#98a2b3;margin-top:8px">耗时 1.2s</div>
+          </div>
+
+          <div class="resp">
+            <div class="bar"><span class="tag" style="color:#00B42A;background:#E8FFEA">温和化解</span><span class="desc">四两拨千斤，不撕破脸</span></div>
+            <div class="q">我周末确实有安排了，方案我可以周一上午优先处理，或者咱们现在对一下分工，看哪部分能提前？</div>
+            <div class="why"><span class="t">为什么有效</span>先说明自己有安排，不直接顶回去，同时给出替代时间点，既守住了边界又没让对方下不来台。把「能不能加班」换成「怎么排期」，主动权就回到了你手里。</div>
+            <div class="btns"><b class="main">复制</b><b>换个说法</b><b>加入语录</b></div>
+          </div>
+
+          <div class="resp">
+            <div class="bar"><span class="tag" style="color:#FF7D00;background:#FFF3E8">幽默带过</span><span class="desc">轻松岔开，气氛不僵</span></div>
+            <div class="q">「比较有空」这个评价我可不敢当😂 不过方案我可以帮忙把框架先搭出来，具体内容咱周一碰？</div>
+            <div class="why"><span class="t">为什么有效</span>用自嘲化解「就你有空」的预设，不硬接加班，但也没把话聊死。幽默给了对方台阶，框架先搭又留了配合的姿态。</div>
+            <div class="btns"><b class="main">复制</b><b>换个说法</b><b>加入语录</b></div>
+          </div>
+
+          <div class="footer">鸭鸭只是帮你组织语言，开口前记得结合当下语境哦</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 新版 -->
+    <div class="phone-wrap" id="wrap-new">
+      <div class="phone-label"><span class="dot" style="background:#e8651a"></span>改版后 · 图文锦囊卡</div>
+      <div class="phone">
+        <div class="navbar"><div class="dots"><i></i><i></i><i></i></div>帮你拆招</div>
+        <div class="scroll">
+          <div class="orig"><div class="k">对方说</div><div class="v">「这个周末你能不能加个班把方案赶出来？大家都挺忙的，就你比较有空。」</div></div>
+
+          <div class="hero">
+            <div class="duck">🐤</div>
+            <div class="tx"><div class="t1">别慌，鸭鸭帮你看穿了 👀</div><div class="t2">给你备好 <b>3</b> 套回话，挑一句直接发</div></div>
+            <div class="spark">✨</div>
+          </div>
+
+          <div class="diag">
+            <div class="dh"><div class="l">🕵️ 对方这句，什么来路</div><span class="badge" style="color:#F53F3F;background:#F53F3F1A">明显施压</span></div>
+            <div class="chips"><span class="chip">🔍 试探</span><span class="chip">⚠️ 施压</span><span class="chip">❓ 道德绑架</span></div>
+            <div class="meter"><span class="ml">来势</span><div class="track"><i class="seg" style="background:#F53F3F"></i><i class="seg" style="background:#F53F3F"></i><i class="seg" style="background:#F53F3F"></i></div><span class="mv" style="color:#F53F3F">来势猛</span></div>
+            <div class="trans">
+              <div class="tk">💭 鸭鸭帮你翻译一下</div>
+              <div class="tv" id="sit-brief">对方用「大家都挺忙」把加班包装成集体处境，再用「就你比较有空」给你扣…</div>
+              <span class="more" id="sit-more" onclick="toggleSit()">看完整解读 ▾</span>
+            </div>
+            <div class="foot">⚡ 用时 1.2s</div>
+          </div>
+
+          <!-- 第 1 招 -->
+          <div class="sack" style="border-color:#00B42A33">
+            <div class="head" style="background:#E8FFEA">
+              <div class="avatar" style="border-color:#00B42A33">🕊️</div>
+              <div class="ht"><div class="hn" style="color:#00B42A">温和化解</div><div class="hd">四两拨千斤，不撕破脸</div></div>
+              <div class="rank" style="background:#00B42A">第 1 招</div>
+            </div>
+            <div class="body">
+              <div class="motto" style="color:#00B42A;background:#00B42A12;border-color:#00B42A">💡 先接住，再给台阶</div>
+              <div class="quote" style="border-color:#00B42A"><span class="qm" style="color:#00B42A">“</span><div class="qt">我周末确实有安排了，方案我可以周一上午优先处理，或者咱们现在对一下分工，看哪部分能提前？</div></div>
+              <div class="why" onclick="toggleWhy(this)"><div class="rh"><span class="rl">🤔 为什么这么说</span><span class="rt">看看门道 ▾</span></div><div class="rb">先说明自己有安排，不直接顶回去，同时给出替代时间点，既守住了边界又没让对方下不来台。把「能不能加班」换成「怎么排期」，主动权就回到了你手里。</div></div>
+            </div>
+            <div class="btns"><b class="main" style="background:#00B42A" onclick="toast(this,'已复制，拿去用吧')">复制这句</b><b onclick="toast(this,'换个说法~')">🔄 换说法</b><b onclick="toast(this,'已收进语录')">＋ 收进语录</b></div>
+          </div>
+
+          <!-- 第 2 招 -->
+          <div class="sack" style="border-color:#FF7D0033">
+            <div class="head" style="background:#FFF3E8">
+              <div class="avatar" style="border-color:#FF7D0033">😏</div>
+              <div class="ht"><div class="hn" style="color:#FF7D00">幽默带过</div><div class="hd">轻松岔开，气氛不僵</div></div>
+              <div class="rank" style="background:#FF7D00">第 2 招</div>
+            </div>
+            <div class="body">
+              <div class="motto" style="color:#FF7D00;background:#FF7D0012;border-color:#FF7D00">💡 笑着破掉「就你有空」</div>
+              <div class="quote" style="border-color:#FF7D00"><span class="qm" style="color:#FF7D00">“</span><div class="qt">「比较有空」这个评价我可不敢当😂 不过方案我可以帮忙把框架先搭出来，具体内容咱周一碰？</div></div>
+              <div class="why" onclick="toggleWhy(this)"><div class="rh"><span class="rl">🤔 为什么这么说</span><span class="rt">看看门道 ▾</span></div><div class="rb">用自嘲化解「就你有空」的预设，不硬接加班，但也没把话聊死。幽默给了对方台阶，框架先搭又留了配合的姿态。</div></div>
+            </div>
+            <div class="btns"><b class="main" style="background:#FF7D00" onclick="toast(this,'已复制，拿去用吧')">复制这句</b><b onclick="toast(this,'换个说法~')">🔄 换说法</b><b onclick="toast(this,'已收进语录')">＋ 收进语录</b></div>
+          </div>
+
+          <!-- 第 3 招 -->
+          <div class="sack" style="border-color:#F53F3F33">
+            <div class="head" style="background:#FFECE8">
+              <div class="avatar" style="border-color:#F53F3F33">🛡️</div>
+              <div class="ht"><div class="hn" style="color:#F53F3F">直接拒绝</div><div class="hd">表明立场，不卑不亢</div></div>
+              <div class="rank" style="background:#F53F3F">第 3 招</div>
+            </div>
+            <div class="body">
+              <div class="motto" style="color:#F53F3F;background:#F53F3F12;border-color:#F53F3F">💡 亮明边界，把球递回去</div>
+              <div class="quote" style="border-color:#F53F3F"><span class="qm" style="color:#F53F3F">“</span><div class="qt">周末我已经有安排了，这个时间我加不了。如果方案紧急，咱们现在花十分钟把优先级排一下，我看能不能今天先推进一部分。</div></div>
+              <div class="why" onclick="toggleWhy(this)"><div class="rh"><span class="rl">🤔 为什么这么说</span><span class="rt">看看门道 ▾</span></div><div class="rb">明确说不，同时把解决方案递回去，态度清楚但不失配合。先给结论再给替代，对方就不用反复来磨。</div></div>
+            </div>
+            <div class="btns"><b class="main" style="background:#F53F3F" onclick="toast(this,'已复制，拿去用吧')">复制这句</b><b onclick="toast(this,'换个说法~')">🔄 换说法</b><b onclick="toast(this,'已收进语录')">＋ 收进语录</b></div>
+          </div>
+
+          <div class="footer">鸭鸭只是帮你组织语言，开口前记得结合当下语境哦</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>这次改版到底变了什么：</b>
+    <ul>
+      <li><b>结果区多了鸭鸭 IP 结论条</b>——「别慌，鸭鸭帮你看穿了」+ 大号回话数，先给情绪价值再给结果。</li>
+      <li><b>意图卡重做成诊断卡</b>——加情绪温度计（来势多猛一眼看到）、带图标的意图 chips、情境翻译卡给一句话常驻（不再整段藏起来）。</li>
+      <li><b>回话卡升级成风格锦囊卡</b>——每种风格一个专属色 + 大 emoji 头像 +「第 N 招」角标，三张卡一眼区分。</li>
+      <li><b>每招顶部一句口诀</b>——用前端从现有文本自动提炼，不再依赖 AI 新增字段，规则/降级模式也会显示。</li>
+      <li><b>回话正文放大成视觉主角</b>，长解析默认收起、想看再点「看看门道」。</li>
+    </ul>
+    口诀 / 第 N 招 / 温度计 / 情境摘要 都是纯前端渲染，<b>不改动 AI 输出格式、不阻断提审</b>。此页为高保真静态对照，真实小程序以构建后的 weapp 包为准。
+  </div>
+
+  <div class="toast" id="toast"></div>
+<script>
+  function setView(v){
+    document.getElementById('both').classList.toggle('on',v==='both');
+    document.getElementById('old').classList.toggle('on',v==='old');
+    document.getElementById('new').classList.toggle('on',v==='new');
+    document.getElementById('wrap-old').style.display = (v==='new')?'none':'flex';
+    document.getElementById('wrap-new').style.display = (v==='old')?'none':'flex';
+  }
+  function toggleWhy(el){
+    el.classList.toggle('open');
+    var rt = el.querySelector('.rt');
+    rt.textContent = el.classList.contains('open') ? '收起 ▴' : '看看门道 ▾';
+  }
+  var sitFull = '对方用「大家都挺忙」先把加班包装成集体处境，再用「就你比较有空」给你扣一个不帮忙就是不合群的帽子，本质是把自己的排期压力转嫁给你，让你不好意思拒绝。这类话的重点不在方案本身，而在用情面替你做了决定。';
+  var sitBrief = '对方用「大家都挺忙」把加班包装成集体处境，再用「就你比较有空」给你扣…';
+  var sitOpen = false;
+  function toggleSit(){
+    sitOpen = !sitOpen;
+    document.getElementById('sit-brief').textContent = sitOpen ? sitFull : sitBrief;
+    document.getElementById('sit-more').textContent = sitOpen ? '收起 ▴' : '看完整解读 ▾';
+  }
+  var toastTimer;
+  function toast(el,msg){
+    var t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.classList.remove('show'); },1400);
+    if(el && msg.indexOf('复制')>-1){ el.textContent='已复制 ✓'; setTimeout(function(){el.textContent='复制这句';},1400); }
+  }
+</script>
+</body>
+</html>

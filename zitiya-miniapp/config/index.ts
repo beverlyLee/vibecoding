@@ -66,6 +66,11 @@ export default defineConfig<'webpack5'>(async (merge, { command, mode }) => {
       },
       webpackChain(chain) {
         chain.resolve.plugin('tsconfig-paths').use(TsconfigPathsPlugin);
+        // 应急开关：部分构建环境下 CssMinimizerPlugin 会在 sealing(92%) 阶段卡死，
+        // 显式设置 SKIP_MINIFY=1 时跳过压缩以产出未压缩包。默认行为完全不变。
+        if (process.env.SKIP_MINIFY === '1') {
+          chain.optimization.minimize(false);
+        }
       },
     },
     h5: {
